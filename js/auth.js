@@ -1,7 +1,7 @@
 // Configuração de acesso Restrito
 const ADMIN_CREDENTIALS = {
     user: "fiodeaxe", // Mantemos em minúsculo aqui para comparação
-    pass: "fiodeaxe2026" 
+    pass: "fiodeaxe" 
 };
 
 // Função que bloqueia páginas protegidas
