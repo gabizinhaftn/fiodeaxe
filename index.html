@@ -10,7 +10,7 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBwW7An4b8M6WHFB5PNXBKXFDNZ5Nw1fIY",
@@ -25,11 +25,12 @@
         const app = initializeApp(firebaseConfig);
         const db_online = getFirestore(app);
 
-        // Disponibiliza para o script abaixo
+        // Disponibiliza para o script global
         window.db_online = db_online;
         window.collection = collection;
         window.onSnapshot = onSnapshot;
         window.query = query;
+        window.addDoc = addDoc;
     </script>
 
     <style>
@@ -170,13 +171,14 @@
             </header>
 
             <main class="max-w-7xl mx-auto px-6 md:px-10 pb-20">
-                <div id="vitrine" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"></div>
+                <div id="vitrine" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                    </div>
             </main>
         </div>
 
         <div id="section-pedidos" class="hidden-section max-w-7xl mx-auto px-6 md:px-10 py-20">
             <h2 class="font-cinzel text-5xl text-stone-800 mb-2 uppercase">Meus Pedidos</h2>
-            <p class="text-stone-500 mb-10 text-lg">Acompanhe aqui o histórico de suas peças encomendadas.</p>
+            <p class="text-stone-500 mb-10 text-lg">Acompanhe aqui o histórico de suas peças encomendas.</p>
             
             <div class="bg-white rounded-xl shadow-sm overflow-x-auto">
                 <table class="w-full text-left">
@@ -184,12 +186,12 @@
                         <tr>
                             <th class="px-6 py-4">Itens da Encomenda</th>
                             <th class="px-6 py-4">Valor Total</th>
+                            <th class="px-6 py-4">Data</th>
                             <th class="px-6 py-4">Status</th>
                         </tr>
                     </thead>
                     <tbody id="lista-pedidos" class="text-sm">
-                        <tr><td colspan="3" class="px-6 py-12 text-center text-stone-400 italic">Você ainda não possui pedidos processados.</td></tr>
-                    </tbody>
+                        </tbody>
                 </table>
             </div>
         </div>
@@ -249,25 +251,59 @@
     </aside>
 
     <script>
-        let db = []; // Agora vem do Firebase
+        let db = []; 
         let carrinho = [];
 
-        // SINCRONIZAÇÃO EM TEMPO REAL COM O FIREBASE
+        // SINCRONIZAÇÃO COM FIREBASE (API ONLINE)
         function initFirebaseSync() {
             if (!window.db_online) {
                 setTimeout(initFirebaseSync, 500);
                 return;
             }
 
+            // Busca os produtos online
             const q = window.query(window.collection(window.db_online, "produtos"));
-            
             window.onSnapshot(q, (querySnapshot) => {
                 db = [];
                 querySnapshot.forEach((doc) => {
-                    db.push({ id: doc.id, ...doc.data() });
+                    const data = doc.data();
+                    db.push({ 
+                        id: doc.id, 
+                        ...data,
+                        imagem: data.imagemUrl || data.imagem
+                    });
                 });
                 renderizarVitrine(db);
                 console.log("Axé conectado! Produtos atualizados.");
+            });
+
+            // Busca as vendas (pedidos) online para mostrar no "Meus Pedidos"
+            const qVendas = window.query(window.collection(window.db_online, "vendas"));
+            window.onSnapshot(qVendas, (querySnapshot) => {
+                const listaPedidos = document.getElementById('lista-pedidos');
+                let htmlPedidos = "";
+                
+                querySnapshot.forEach((doc) => {
+                    const v = doc.data();
+                    htmlPedidos += `
+                        <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
+                            <td class="px-6 py-4 font-semibold">${v.itens}</td>
+                            <td class="px-6 py-4">R$ ${parseFloat(v.total).toFixed(2)}</td>
+                            <td class="px-6 py-4 text-stone-400">${v.data}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                                    ${v.status || 'Pendente'}
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                if(htmlPedidos === "") {
+                    listaPedidos.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic">Você ainda não possui pedidos.</td></tr>`;
+                } else {
+                    listaPedidos.innerHTML = htmlPedidos;
+                }
             });
         }
 
@@ -304,13 +340,11 @@
         }
 
         function filtrarProdutos(cat) {
-            // Ajustado para aceitar 'GUIAS' em maiúsculo
-            const filtrados = cat === 'todos' ? db : db.filter(p => p.categoria === cat);
+            const filtrados = cat === 'todos' ? db : db.filter(p => p.categoria.toUpperCase() === cat.toUpperCase());
             renderizarVitrine(filtrados);
             
             document.getElementById('btn-filter-all').className = cat === 'todos' ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
-            // Ajustado para refletir a categoria correta no botão
-            document.getElementById('btn-filter-guias').className = (cat === 'GUIAS' || cat === 'Guias de Orixá') ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
+            document.getElementById('btn-filter-guias').className = (cat.toUpperCase() === 'GUIAS') ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
         }
 
         function toggleCart() {
@@ -356,22 +390,50 @@
             updateCartUI();
         }
 
-        function finalizarWhatsApp() {
+        // REGISTRA A VENDA NA API (FIREBASE) ANTES DE IR PRO WHATSAPP
+        async function finalizarWhatsApp() {
             if(carrinho.length === 0) return alert("Sua sacola está vazia!");
+            
             const numero = "5511984348036"; 
-            let total = 0;
+            let totalVenda = 0;
+            let nomesItens = carrinho.map(p => p.nome).join(', ');
             let mensagem = `Olá! Gostaria de encomendar os seguintes itens:\n\n`;
+            
             carrinho.forEach(p => {
                 mensagem += `• ${p.nome} - R$ ${parseFloat(p.preco).toFixed(2)}\n`;
-                total += parseFloat(p.preco);
+                totalVenda += parseFloat(p.preco);
             });
-            mensagem += `\n*Total: R$ ${total.toFixed(2)}*`;
-            window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
+            mensagem += `\n*Total: R$ ${totalVenda.toFixed(2)}*`;
+
+            try {
+                // Salva o registro da venda no Firebase para o Admin ver
+                await window.addDoc(window.collection(window.db_online, "vendas"), {
+                    cliente: "Novo Cliente (WhatsApp)",
+                    itens: nomesItens,
+                    total: totalVenda.toFixed(2),
+                    data: new Date().toLocaleDateString('pt-BR'),
+                    status: "Aguardando Pagamento",
+                    pagamento: "Pendente"
+                });
+
+                // Abre o WhatsApp
+                window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
+                
+                // Limpa o carrinho
+                carrinho = [];
+                updateCartUI();
+                toggleCart();
+                alert("Pedido enviado! Verifique o WhatsApp para combinar o pagamento.");
+                
+            } catch (e) {
+                console.error("Erro ao registrar venda: ", e);
+                // Se der erro na API, abre o zap mesmo assim
+                window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
+            }
         }
 
         window.onload = () => {
             initFirebaseSync();
-            if(typeof verificarAcesso === "function") verificarAcesso();
         };
     </script>
 </body>
