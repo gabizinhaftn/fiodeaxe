@@ -137,7 +137,7 @@
                                     <img id="image-preview" class="hidden max-h-48 rounded shadow-md border-2 border-white">
                                 </div>
                             </div>
-                            <button type="submit" class="w-full bg-[#2d3a2e] text-white py-4 font-bold uppercase tracking-widest hover:bg-black transition shadow-lg rounded">Publicar Produto</button>
+                            <button type="submit" id="btn-publicar" class="w-full bg-[#2d3a2e] text-white py-4 font-bold uppercase tracking-widest hover:bg-black transition shadow-lg rounded">Publicar Produto</button>
                         </div>
                     </form>
                 </div>
@@ -235,95 +235,124 @@
         </div>
     </div>
 
-    <script>
-        // Inicialização do Banco de Dados Local
-        let db = JSON.parse(localStorage.getItem('meu_estoque')) || [];
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Configuração do seu Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyBwW7An4b8M6WHFB5PNXBKXFDNZ5Nw1fIY",
+            authDomain: "fiodeaxe-d6e29.firebaseapp.com",
+            projectId: "fiodeaxe-d6e29",
+            storageBucket: "fiodeaxe-d6e29.firebasestorage.app",
+            messagingSenderId: "276832839443",
+            appId: "1:276832839443:web:4f34bd6ad0d159f9d41ce6"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const fbDb = getFirestore(app);
+        
+        let db = []; // Lista local de produtos sincronizada
         let vendas = JSON.parse(localStorage.getItem('minhas_vendas')) || [];
+
+        // 1. SINCRONIZAÇÃO EM TEMPO REAL COM FIREBASE
+        onSnapshot(collection(fbDb, "produtos"), (snapshot) => {
+            db = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderizarLista();
+            updateStats();
+        });
+
+        // 2. CADASTRO DE PRODUTO NO FIREBASE
+        document.getElementById('form-cadastro').onsubmit = async function(e) {
+            e.preventDefault();
+            const btn = document.getElementById('btn-publicar');
+            const fileInput = document.getElementById('foto_input');
+            const file = fileInput.files[0];
+            
+            if(!file) return alert("Selecione uma foto.");
+
+            btn.innerText = "Publicando...";
+            btn.disabled = true;
+
+            const reader = new FileReader();
+            reader.onload = async function(event) {
+                try {
+                    const novoDoc = {
+                        nome: document.getElementById('nome').value,
+                        categoria: document.getElementById('categoria').value,
+                        preco: document.getElementById('preco').value,
+                        status: document.getElementById('status').value,
+                        descricao: document.getElementById('descricao').value,
+                        imagem: event.target.result, // Base64 da imagem
+                        criadoEm: new Date()
+                    };
+
+                    await addDoc(collection(fbDb, "produtos"), novoDoc);
+                    alert('✨ Produto consagrado com sucesso!');
+                    document.getElementById('form-cadastro').reset();
+                    document.getElementById('image-preview').classList.add('hidden');
+                    document.getElementById('preview-text').classList.remove('hidden');
+                } catch (err) {
+                    alert("Erro ao salvar: " + err.message);
+                } finally {
+                    btn.innerText = "Publicar Produto";
+                    btn.disabled = false;
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        // 3. ATUALIZAÇÃO NO FIREBASE
+        document.getElementById('form-edicao').onsubmit = async function(e) {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const docRef = doc(fbDb, "produtos", id);
+
+            try {
+                await updateDoc(docRef, {
+                    nome: document.getElementById('edit-nome').value,
+                    categoria: document.getElementById('edit-categoria').value,
+                    preco: document.getElementById('edit-preco').value,
+                    status: document.getElementById('edit-status').value
+                });
+                fecharModal();
+            } catch (err) {
+                alert("Erro ao atualizar.");
+            }
+        };
+
+        // 4. REMOÇÃO NO FIREBASE
+        window.remover = async function(id) {
+            if(confirm('Deseja realmente remover este item do axé?')) {
+                try {
+                    await deleteDoc(doc(fbDb, "produtos", id));
+                } catch (err) {
+                    alert("Erro ao excluir.");
+                }
+            }
+        };
+
+        // Torna as funções globais para o HTML poder chamá-las
+        window.switchTab = switchTab;
+        window.previewImage = previewImage;
+        window.filtrarProdutos = filtrarProdutos;
+        window.abrirModal = abrirModal;
+        window.fecharModal = fecharModal;
+        window.limparVendas = limparVendas;
+        window.atualizarStatusVenda = atualizarStatusVenda;
+
+        // --- LÓGICA DE INTERFACE (MANTIDA) ---
 
         function updateStats() {
             document.getElementById('stat-total-itens').innerText = db.length;
-            
-            // Corrige cálculo de faturamento tratando vírgula e ponto
             const totalFaturado = vendas.reduce((acc, v) => {
                 let valor = v.total.toString().replace('R$', '').replace('.', '').replace(',', '.').trim();
                 return acc + (parseFloat(valor) || 0);
             }, 0);
-            
             document.getElementById('stat-faturamento').innerText = `R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-            
             const esgotados = db.filter(p => p.status === 'esgotado').length;
             document.getElementById('stat-esgotados').innerText = esgotados;
         }
-
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-            document.querySelectorAll('.nav-link').forEach(n => {
-                n.classList.remove('active-link');
-                n.classList.add('text-stone-300');
-            });
-
-            document.getElementById('tab-' + tab).classList.add('active');
-            const navElement = document.getElementById('nav-' + tab);
-            if(navElement) {
-                navElement.classList.add('active-link');
-                navElement.classList.remove('text-stone-300');
-            }
-
-            if(tab === 'produtos') renderizarLista();
-            if(tab === 'relatorios') renderizarVendas();
-            updateStats();
-        }
-
-        function previewImage(input) {
-            const preview = document.getElementById('image-preview');
-            const text = document.getElementById('preview-text');
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    preview.src = e.target.result;
-                    preview.classList.remove('hidden');
-                    text.classList.add('hidden');
-                }
-                reader.readAsDataURL(input.files[0]);
-            }
-        }
-
-        function filtrarProdutos() {
-            const termo = document.getElementById('busca-produto').value.toLowerCase();
-            const filtrados = db.filter(p => p.nome.toLowerCase().includes(termo));
-            renderizarLista(filtrados);
-        }
-
-        document.getElementById('form-cadastro').onsubmit = function(e) {
-            e.preventDefault();
-            const fileInput = document.getElementById('foto_input');
-            const file = fileInput.files[0];
-            
-            if(!file) return alert("Por favor, selecione uma foto.");
-
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const novo = {
-                    id: Date.now(),
-                    nome: document.getElementById('nome').value,
-                    categoria: document.getElementById('categoria').value,
-                    preco: document.getElementById('preco').value,
-                    status: document.getElementById('status').value,
-                    descricao: document.getElementById('descricao').value,
-                    imagem: event.target.result
-                };
-
-                db.push(novo);
-                localStorage.setItem('meu_estoque', JSON.stringify(db));
-                alert('✨ Produto consagrado no catálogo com sucesso!');
-                
-                document.getElementById('form-cadastro').reset();
-                document.getElementById('image-preview').classList.add('hidden');
-                document.getElementById('preview-text').classList.remove('hidden');
-                updateStats();
-            };
-            reader.readAsDataURL(file);
-        };
 
         function renderizarLista(dados = db) {
             const corpo = document.getElementById('lista-corpo');
@@ -344,12 +373,62 @@
                     </td>
                     <td class="p-4 text-center">
                         <div class="flex justify-center gap-2">
-                            <button onclick="abrirModal(${p.id})" class="bg-stone-100 px-3 py-2 text-[9px] font-bold uppercase hover:bg-[#c5a059] hover:text-white transition rounded">Editar</button>
-                            <button onclick="remover(${p.id})" class="bg-red-50 text-red-400 px-3 py-2 text-[9px] font-bold uppercase hover:bg-red-500 hover:text-white transition rounded">Excluir</button>
+                            <button onclick="abrirModal('${p.id}')" class="bg-stone-100 px-3 py-2 text-[9px] font-bold uppercase hover:bg-[#c5a059] hover:text-white transition rounded">Editar</button>
+                            <button onclick="remover('${p.id}')" class="bg-red-50 text-red-400 px-3 py-2 text-[9px] font-bold uppercase hover:bg-red-500 hover:text-white transition rounded">Excluir</button>
                         </div>
                     </td>
                 </tr>
             `).join('');
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-link').forEach(n => {
+                n.classList.remove('active-link');
+                n.classList.add('text-stone-300');
+            });
+            document.getElementById('tab-' + tab).classList.add('active');
+            const navElement = document.getElementById('nav-' + tab);
+            if(navElement) {
+                navElement.classList.add('active-link');
+                navElement.classList.remove('text-stone-300');
+            }
+            if(tab === 'relatorios') renderizarVendas();
+            updateStats();
+        }
+
+        function previewImage(input) {
+            const preview = document.getElementById('image-preview');
+            const text = document.getElementById('preview-text');
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                    text.classList.add('hidden');
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function abrirModal(id) {
+            const p = db.find(item => item.id === id);
+            if(p) {
+                document.getElementById('edit-id').value = p.id;
+                document.getElementById('edit-nome').value = p.nome;
+                document.getElementById('edit-categoria').value = p.categoria;
+                document.getElementById('edit-preco').value = p.preco;
+                document.getElementById('edit-status').value = p.status;
+                document.getElementById('modal-edicao').classList.remove('hidden');
+            }
+        }
+
+        function fecharModal() { document.getElementById('modal-edicao').classList.add('hidden'); }
+
+        function filtrarProdutos() {
+            const termo = document.getElementById('busca-produto').value.toLowerCase();
+            const filtrados = db.filter(p => p.nome.toLowerCase().includes(termo));
+            renderizarLista(filtrados);
         }
 
         function renderizarVendas() {
@@ -390,50 +469,6 @@
                 updateStats();
             }
         }
-
-        function abrirModal(id) {
-            const p = db.find(item => item.id === id);
-            if(p) {
-                document.getElementById('edit-id').value = p.id;
-                document.getElementById('edit-nome').value = p.nome;
-                document.getElementById('edit-categoria').value = p.categoria;
-                document.getElementById('edit-preco').value = p.preco;
-                document.getElementById('edit-status').value = p.status;
-                document.getElementById('modal-edicao').classList.remove('hidden');
-            }
-        }
-
-        function fecharModal() { document.getElementById('modal-edicao').classList.add('hidden'); }
-
-        document.getElementById('form-edicao').onsubmit = function(e) {
-            e.preventDefault();
-            const id = parseInt(document.getElementById('edit-id').value);
-            const index = db.findIndex(p => p.id === id);
-            if(index !== -1) {
-                db[index].nome = document.getElementById('edit-nome').value;
-                db[index].categoria = document.getElementById('edit-categoria').value;
-                db[index].preco = document.getElementById('edit-preco').value;
-                db[index].status = document.getElementById('edit-status').value;
-                localStorage.setItem('meu_estoque', JSON.stringify(db));
-                fecharModal();
-                renderizarLista();
-                updateStats();
-            }
-        };
-
-        function remover(id) {
-            if(confirm('Deseja realmente remover este item do axé?')) {
-                db = db.filter(p => p.id !== id);
-                localStorage.setItem('meu_estoque', JSON.stringify(db));
-                renderizarLista();
-                updateStats();
-            }
-        }
-
-        window.onload = function() {
-            updateStats();
-            switchTab('cadastro');
-        };
     </script>
 </body>
 </html>
