@@ -1,6 +1,6 @@
 // Configuração de acesso Restrito
 const ADMIN_CREDENTIALS = {
-    email: "fiodeaxe", // Mantemos em minúsculo aqui para comparação
+    user: "fiodeaxe", // Mantemos em minúsculo aqui para comparação
     pass: "fiodeaxe2026" 
 };
 
@@ -19,14 +19,14 @@ function verificarAcesso() {
 }
 
 // Função de execução do Login
-function login(email, pass) {
+function login(usuario, pass) {
     console.log("Tentativa de login iniciada...");
 
     // .toLowerCase() converte o que o usuário digitou para minúsculo antes de comparar
-    const emailDigitado = String(email).toLowerCase().trim();
-    const emailCorreto = ADMIN_CREDENTIALS.email.toLowerCase();
+    const usuarioDigitado = String(usuario).toLowerCase().trim();
+    const usuarioCorreto = ADMIN_CREDENTIALS.user.toLowerCase();
 
-    if (emailDigitado === emailCorreto && pass === ADMIN_CREDENTIALS.pass) {
+    if (usuarioDigitado === usuarioCorreto && pass === ADMIN_CREDENTIALS.pass) {
         sessionStorage.setItem('fio_de_axe_admin', 'true');
         console.log("Login bem-sucedido! Redirecionando para o painel...");
         
@@ -35,7 +35,7 @@ function login(email, pass) {
             window.location.href = 'admin.html';
         }, 100);
     } else {
-        console.error("Erro: E-mail ou senha incorretos.");
+        console.error("Erro: Usuário ou senha incorretos.");
         alert("Acesso Negado. Credenciais incorretas.");
     }
 }

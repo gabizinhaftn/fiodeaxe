@@ -19,7 +19,7 @@
         </div>
 
         <form id="login-form" class="space-y-6">
-            <input type="email" id="email" placeholder="E-mail de Acesso" 
+            <input type="text" id="email" placeholder="Usuário de Acesso" 
                 class="w-full p-4 border border-stone-100 bg-stone-50 outline-none focus:border-stone-800 transition-all text-xs tracking-widest" 
                 style="text-transform: lowercase;" required autocomplete="off">
             
@@ -42,15 +42,15 @@
         document.getElementById('login-form').addEventListener('submit', function(e) {
             e.preventDefault();
             
-            // Forçamos a conversão para minúsculo e removemos espaços vazios
-            const emailValue = document.getElementById('email').value.toLowerCase().trim();
+            // Forçamos a conversão para minúsculo e removemos espaços vazios (agora tratando como usuário)
+            const userValue = document.getElementById('email').value.toLowerCase().trim();
             const passValue = document.getElementById('pass').value;
 
             // Verificação de segurança: chama a função do auth.js se ela existir
             if (typeof window.login === 'function') {
-                window.login(emailValue, passValue);
+                window.login(userValue, passValue);
             } else if (typeof login === 'function') {
-                login(emailValue, passValue);
+                login(userValue, passValue);
             } else {
                 alert("Erro crítico: Sistema de autenticação não carregado. Verifique se o arquivo auth.js está na mesma pasta.");
             }
