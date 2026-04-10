@@ -199,11 +199,11 @@
                 <div>
                     <label class="block text-[10px] uppercase font-bold text-stone-400 mb-1">Categoria</label>
                     <select id="edit-categoria" class="w-full p-2 border border-stone-200 outline-none focus:border-stone-800 font-bold text-xs uppercase cursor-pointer rounded">
-                        <option value="Guias de Orixá">Guias de Orixá</option>
-                        <option value="Brajás">Brajás</option>
-                        <option value="Utensílios">Utensílios</option>
-                        <option value="Acessórios">Acessórios</option>
-                        <option value="Outros">Outros</option>
+                        <option value="guias">Guias de Orixá</option>
+                        <option value="brajas">Brajás</option>
+                        <option value="utensilios">Utensílios</option>
+                        <option value="acessorios">Acessórios</option>
+                        <option value="outros">Outros</option>
                     </select>
                 </div>
                 <div>
@@ -292,6 +292,7 @@
                 document.getElementById('image-preview').classList.add('hidden');
                 document.getElementById('preview-text').classList.remove('hidden');
                 updateStats();
+                if(document.getElementById('tab-produtos').classList.contains('active')) renderizarLista();
             };
             reader.readAsDataURL(file);
         };
@@ -325,6 +326,10 @@
 
         function renderizarVendas() {
             const corpoVendas = document.getElementById('lista-vendas');
+            if(vendas.length === 0) {
+                corpoVendas.innerHTML = `<tr><td colspan="5" class="p-10 text-center text-stone-400 italic">Nenhuma venda registrada.</td></tr>`;
+                return;
+            }
             corpoVendas.innerHTML = vendas.map((v, index) => `
                 <tr class="border-b border-stone-50 hover:bg-stone-50">
                     <td class="p-6 font-bold text-stone-800">${v.cliente}</td>
@@ -354,7 +359,7 @@
             if(p) {
                 document.getElementById('edit-id').value = p.id;
                 document.getElementById('edit-nome').value = p.nome;
-                document.getElementById('edit-categoria').value = p.categoria || 'guias de orixás';
+                document.getElementById('edit-categoria').value = p.categoria;
                 document.getElementById('edit-preco').value = p.preco;
                 document.getElementById('edit-status').value = p.status;
                 document.getElementById('modal-edicao').classList.remove('hidden');
@@ -387,7 +392,12 @@
             }
         }
 
-        updateStats();
+        // Inicialização
+        window.onload = function() {
+            updateStats();
+            // Inicia na aba de cadastro por padrão ou na que preferir
+            switchTab('cadastro');
+        };
     </script>
 </body>
 </html>

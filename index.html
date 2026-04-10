@@ -7,6 +7,31 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="auth.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBwW7An4b8M6WHFB5PNXBKXFDNZ5Nw1fIY",
+            authDomain: "fiodeaxe-d6e29.firebaseapp.com",
+            projectId: "fiodeaxe-d6e29",
+            storageBucket: "fiodeaxe-d6e29.firebasestorage.app",
+            messagingSenderId: "276832839443",
+            appId: "1:276832839443:web:4f34bd6ad0d159f9d41ce6",
+            measurementId: "G-YKDFVHFVLV"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db_online = getFirestore(app);
+
+        // Disponibiliza para o script abaixo
+        window.db_online = db_online;
+        window.collection = collection;
+        window.onSnapshot = onSnapshot;
+        window.query = query;
+    </script>
+
     <style>
         body { 
             font-family: 'Montserrat', sans-serif; 
@@ -91,7 +116,6 @@
             background-color: #128c7e;
         }
 
-        /* Estilo para os ícones do rodapé */
         .social-icon {
             transition: all 0.3s ease;
             display: flex;
@@ -225,17 +249,31 @@
     </aside>
 
     <script>
-        // --- BANCO DE DADOS E ESTOQUE ---
-        let db = JSON.parse(localStorage.getItem('meu_estoque')) || [
-            {id: 1, nome: "Guia de Oxóssi", preco: 40.00, imagem: "https://i.ibb.co/6R6qBfP/oxossi.jpg", categoria: "Guias de Orixá"},
-        ];
+        let db = []; // Agora vem do Firebase
         let carrinho = [];
 
-        // --- FUNÇÕES DE NAVEGAÇÃO ---
+        // SINCRONIZAÇÃO EM TEMPO REAL COM O FIREBASE
+        function initFirebaseSync() {
+            if (!window.db_online) {
+                setTimeout(initFirebaseSync, 500);
+                return;
+            }
+
+            const q = window.query(window.collection(window.db_online, "produtos"));
+            
+            window.onSnapshot(q, (querySnapshot) => {
+                db = [];
+                querySnapshot.forEach((doc) => {
+                    db.push({ id: doc.id, ...doc.data() });
+                });
+                renderizarVitrine(db);
+                console.log("Axé conectado! Produtos atualizados.");
+            });
+        }
+
         function showSection(section) {
             document.getElementById('section-home').classList.toggle('hidden-section', section !== 'home');
             document.getElementById('section-pedidos').classList.toggle('hidden-section', section !== 'pedidos');
-            
             window.scrollTo({top: 0, behavior: 'smooth'});
         }
 
@@ -257,7 +295,7 @@
                         <p class="text-[11px] uppercase tracking-widest text-orange-600 font-bold mb-1">${p.categoria || 'Arte Axé'}</p>
                         <h4 class="font-cinzel text-2xl text-stone-800 mb-2">${p.nome}</h4>
                         <p class="text-stone-800 text-lg font-semibold mb-4 italic">R$ ${parseFloat(p.preco).toFixed(2)}</p>
-                        <button onclick="addCart(${p.id})" class="w-full btn-pill btn-outline text-[13px] hover:border-black hover:text-black transition-colors">
+                        <button onclick="addCart('${p.id}')" class="w-full btn-pill btn-outline text-[13px] hover:border-black hover:text-black transition-colors">
                             Adicionar à Sacola
                         </button>
                     </div>
@@ -273,7 +311,6 @@
             document.getElementById('btn-filter-guias').className = cat === 'Guias de Orixá' ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
         }
 
-        // --- LÓGICA DO CARRINHO ---
         function toggleCart() {
             document.getElementById('cart-sidebar').classList.toggle('open');
             document.getElementById('cart-overlay').classList.toggle('hidden');
@@ -319,22 +356,19 @@
 
         function finalizarWhatsApp() {
             if(carrinho.length === 0) return alert("Sua sacola está vazia!");
-            
             const numero = "5511984348036"; 
             let total = 0;
             let mensagem = `Olá! Gostaria de encomendar os seguintes itens:\n\n`;
-            
             carrinho.forEach(p => {
                 mensagem += `• ${p.nome} - R$ ${parseFloat(p.preco).toFixed(2)}\n`;
                 total += parseFloat(p.preco);
             });
-            
             mensagem += `\n*Total: R$ ${total.toFixed(2)}*`;
             window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
         }
 
         window.onload = () => {
-            renderizarVitrine();
+            initFirebaseSync();
             if(typeof verificarAcesso === "function") verificarAcesso();
         };
     </script>
