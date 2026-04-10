@@ -10,7 +10,8 @@
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, query, addDoc, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBwW7An4b8M6WHFB5PNXBKXFDNZ5Nw1fIY",
@@ -24,12 +25,36 @@
 
         const app = initializeApp(firebaseConfig);
         const db_online = getFirestore(app);
+        const auth = getAuth(app);
+        const provider = new GoogleAuthProvider();
 
         window.db_online = db_online;
         window.collection = collection;
         window.onSnapshot = onSnapshot;
         window.query = query;
         window.addDoc = addDoc;
+        window.where = where;
+        window.auth = auth;
+        window.signInWithPopup = signInWithPopup;
+        window.provider = provider;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.signOut = signOut;
+
+        // Monitor de estado de login
+        onAuthStateChanged(auth, (user) => {
+            window.userLogado = user;
+            const btnLogin = document.getElementById('btn-login-nav');
+            if (user) {
+                btnLogin.innerHTML = `Sair (${user.displayName || user.email.split('@')[0]})`;
+                btnLogin.onclick = () => auth.signOut();
+                initFirebaseSync(); 
+            } else {
+                btnLogin.innerHTML = `Entrar / Cadastro`;
+                btnLogin.onclick = () => openAuthModal();
+                renderizarPedidosVazio();
+            }
+        });
     </script>
 
     <style>
@@ -129,7 +154,6 @@
         }
         .social-icon:hover { transform: translateY(-3px); opacity: 0.8; }
 
-        /* NOVOS ESTILOS PARA CAIXAS DE ALERTA */
         #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 10001; }
         .toast { 
             background: #1a1a1a; color: white; padding: 16px 24px; border-radius: 12px; 
@@ -139,9 +163,37 @@
             transform: translateX(-120%); transition: transform 0.3s ease-out;
         }
         .toast.show { transform: translateX(0); }
+
+        /* MODAL LOGIN */
+        .modal-auth { z-index: 20000; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
     </style>
 </head>
 <body>
+
+    <div id="modal-auth" class="fixed inset-0 hidden flex items-center justify-center modal-auth p-4">
+        <div class="bg-white p-8 rounded-2xl max-w-md w-full shadow-2xl relative">
+            <button onclick="closeAuthModal()" class="absolute top-4 right-4 text-2xl text-stone-300 hover:text-black">&times;</button>
+            <h3 class="font-cinzel text-2xl mb-6 text-center text-stone-800">Identifique-se</h3>
+            
+            <button onclick="loginGoogle()" class="w-full border p-3 rounded-xl flex items-center justify-center gap-3 mb-6 hover:bg-stone-50 transition font-bold text-stone-700">
+                <img src="https://www.google.com/favicon.ico" class="w-5"> Continuar com Google
+            </button>
+
+            <div class="relative mb-6 text-center">
+                <span class="bg-white px-4 text-gray-400 text-[10px] uppercase tracking-widest relative z-10">Ou use seu e-mail</span>
+                <hr class="absolute top-1/2 w-full border-gray-100">
+            </div>
+
+            <input type="email" id="auth-email" placeholder="Seu e-mail" class="w-full border p-3 rounded-xl mb-3 focus:outline-none focus:border-stone-500">
+            <input type="password" id="auth-pass" placeholder="Sua senha" class="w-full border p-3 rounded-xl mb-6 focus:outline-none focus:border-stone-500">
+            
+            <div class="flex gap-2">
+                <button onclick="loginEmail()" class="flex-1 btn-pill btn-dark">Entrar</button>
+                <button onclick="cadastroEmail()" class="flex-1 btn-pill btn-outline">Cadastrar</button>
+            </div>
+            <p class="text-[10px] text-gray-400 mt-4 text-center italic">Para criar conta, preencha os dados e clique em Cadastrar.</p>
+        </div>
+    </div>
 
     <div id="toast-container"></div>
 
@@ -158,7 +210,8 @@
             <div class="hidden md:flex justify-center gap-8 text-[14px] uppercase font-bold tracking-widest text-stone-600">
                 <button onclick="showSection('home')" class="hover:text-stone-900 transition" id="nav-home">Coleções</button>
                 <button onclick="showSection('pedidos')" class="hover:text-stone-900 transition" id="nav-pedidos">Meus Pedidos</button>
-                <a href="login.html" class="text-orange-600 hover:text-orange-700 transition">Admin</a>
+                <button id="btn-login-nav" class="text-orange-600 hover:text-orange-700 transition">Entrar</button>
+                <a href="login.html" class="text-stone-400 hover:text-stone-900 transition">Admin</a>
             </div>
 
             <div class="flex items-center gap-6 justify-self-end">
@@ -183,8 +236,7 @@
             </header>
 
             <main class="max-w-7xl mx-auto px-6 md:px-10 pb-20">
-                <div id="vitrine" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                    </div>
+                <div id="vitrine" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"></div>
             </main>
         </div>
 
@@ -192,6 +244,11 @@
             <h2 class="font-cinzel text-5xl text-stone-800 mb-2 uppercase">Meus Pedidos</h2>
             <p class="text-stone-500 mb-10 text-lg">Acompanhe aqui o histórico de suas peças encomendas.</p>
             
+            <div id="alerta-login-pedidos" class="p-12 text-center bg-white rounded-xl mb-6 border-2 border-dashed border-stone-100">
+                <p class="text-stone-400 italic mb-4">Você precisa estar logado para ver seus pedidos.</p>
+                <button onclick="openAuthModal()" class="btn-pill btn-dark">Fazer Login agora</button>
+            </div>
+
             <div class="bg-white rounded-xl shadow-sm overflow-x-auto">
                 <table class="w-full text-left">
                     <thead class="bg-stone-50 border-b border-stone-100 text-[12px] uppercase tracking-widest text-stone-400">
@@ -202,8 +259,7 @@
                             <th class="px-6 py-4">Status</th>
                         </tr>
                     </thead>
-                    <tbody id="lista-pedidos" class="text-sm">
-                        </tbody>
+                    <tbody id="lista-pedidos" class="text-sm"></tbody>
                 </table>
             </div>
         </div>
@@ -217,19 +273,10 @@
 
                 <div class="flex justify-center gap-6 mb-10">
                     <a href="#" class="social-icon hover:bg-gradient-to-tr hover:from-yellow-400 hover:to-purple-600" target="_blank">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.917 3.917 0 0 0-1.417.923A3.927 3.927 0 0 0 .42 2.76c-.198.509-.333 1.09-.372 1.942C.01 5.555 0 5.827 0 8s.01 2.445.048 3.299c.04.851.175 1.433.372 1.941a3.926 3.926 0 0 0 .923 1.417 3.911 3.911 0 0 0 1.417.923c.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.445-.01 3.299-.048c.851-.04 1.433-.175 1.941-.372a3.911 3.911 0 0 0 1.417-.923 3.928 3.928 0 0 0 .923-1.417c.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.926 3.926 0 0 0-.923-1.417A3.911 3.911 0 0 0 13.24.42c-.51-.198-1.09-.333-1.942-.372C10.445.01 10.173 0 8 0zm0 1.441c2.131 0 2.384.009 3.227.048.786.036 1.212.167 1.497.278.378.147.648.322.932.606.284.284.459.554.606.932.11.285.241.711.278 1.497.039.843.048 1.096.048 3.227s-.009 2.384-.048 3.227c-.036.786-.167 1.212-.278 1.498a2.707 2.707 0 0 1-.606.932 2.708 2.708 0 0 1-.932.606c-.285.11-.711.241-1.498.278-.843.039-1.096.048-3.227.048s-2.384-.009-3.227-.048c-.786-.036-1.212-.167-1.497-.278a2.308 2.308 0 0 1-.932-.606 2.308 2.308 0 0 1-.606-.932c-.11-.285-.241-.711-.278-1.497-.039-.843-.048-1.096-.048-3.227s.009-2.384.048-3.227c.036-.786.167-1.212.278-1.497.147-.378.322-.648.606-.932.284-.284.554-.459.932-.606.285-.11.711-.241 1.497-.278.843-.039 1.096-.048 3.227-.048z"/>
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.917 3.917 0 0 0-1.417.923A3.927 3.927 0 0 0 .42 2.76c-.198.509-.333 1.09-.372 1.942C.01 5.555 0 5.827 0 8s.01 2.445.048 3.299c.04.851.175 1.433.372 1.941a3.926 3.926 0 0 0 .923 1.417 3.911 3.911 0 0 0 1.417.923c.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.445-.01 3.299-.048c.851-.04 1.433-.175 1.941-.372a3.911 3.911 0 0 0 1.417-.923 3.928 3.928 0 0 0 .923-1.417c.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.926 3.926 0 0 0-.923-1.417A3.911 3.911 0 0 0 13.24.42c-.51-.198-1.09-.333-1.942-.372C10.445.01 10.173 0 8 0zm0 1.441c2.131 0 2.384.009 3.227.048.786.036 1.212.167 1.497.278.378.147.648.322.932.606.284.284.459.554.606.932.11.285.241.711.278 1.497.039.843.048 1.096.048 3.227s-.009 2.384-.048 3.227c-.036.786-.167 1.212-.278 1.498a2.707 2.707 0 0 1-.606.932 2.708 2.708 0 0 1-.932.606c-.285.11-.711.241-1.498.278-.843.039-1.096.048-3.227.048s-2.384-.009-3.227-.048c-.786-.036-1.212-.167-1.497-.278a2.308 2.308 0 0 1-.932-.606 2.308 2.308 0 0 1-.606-.932c-.11-.285-.241-.711-.278-1.497-.039-.843-.048-1.096-.048-3.227s.009-2.384.048-3.227c.036-.786.167-1.212.278-1.497.147-.378.322-.648.606-.932.284-.284.554-.459.932-.606.285-.11.711-.241 1.497-.278.843-.039 1.096-.048 3.227-.048z"/></svg>
                     </a>
                     <a href="#" class="social-icon hover:bg-black" target="_blank">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M9 0h1.98c.144.715.54 1.617 1.235 2.512C12.895 3.389 13.797 4 15 4v2c-1.753 0-3.07-.814-4-1.829V11a5 5 0 1 1-5-5v2a3 3 0 1 0 3 3z"/>
-                        </svg>
-                    </a>
-                    <a href="https://wa.me/5511984348036" class="social-icon hover:bg-green-500" target="_blank">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
-                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M9 0h1.98c.144.715.54 1.617 1.235 2.512C12.895 3.389 13.797 4 15 4v2c-1.753 0-3.07-.814-4-1.829V11a5 5 0 1 1-5-5v2a3 3 0 1 0 3 3z"/></svg>
                     </a>
                 </div>
 
@@ -241,9 +288,7 @@
     </div>
 
     <a href="https://wa.me/5511984348036?text=Olá,%20gostaria%20de%20tirar%20uma%20dúvida" class="whatsapp-float" target="_blank">
-        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" viewBox="0 0 16 16">
-            <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/>
-        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" viewBox="0 0 16 16"><path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326zM7.994 14.521a6.573 6.573 0 0 1-3.356-.92l-.24-.144-2.494.654.666-2.433-.156-.251a6.56 6.56 0 0 1-1.007-3.505c0-3.626 2.957-6.584 6.591-6.584a6.56 6.56 0 0 1 4.66 1.931 6.557 6.557 0 0 1 1.928 4.66c-.004 3.639-2.961 6.592-6.592 6.592zm3.615-4.934c-.197-.099-1.17-.578-1.353-.646-.182-.065-.315-.099-.445.099-.133.197-.513.646-.627.775-.114.133-.232.148-.43.05-.197-.1-.836-.308-1.592-.985-.59-.525-.985-1.175-1.103-1.372-.114-.198-.011-.304.088-.403.087-.088.197-.232.296-.346.1-.114.133-.198.198-.33.065-.134.034-.248-.015-.347-.05-.099-.445-1.076-.612-1.47-.16-.389-.323-.335-.445-.34-.114-.007-.247-.007-.38-.007a.729.729 0 0 0-.529.247c-.182.198-.691.677-.691 1.654 0 .977.71 1.916.81 2.049.098.133 1.394 2.132 3.383 2.992.47.205.84.326 1.129.418.475.152.904.129 1.246.08.38-.058 1.171-.48 1.338-.943.164-.464.164-.86.114-.943-.049-.084-.182-.133-.38-.232z"/></svg>
     </a>
 
     <div id="cart-overlay" class="fixed inset-0 bg-black/20 backdrop-blur-sm hidden" onclick="toggleCart()"></div>
@@ -266,21 +311,50 @@
         let db = []; 
         let carrinho = [];
 
-        // FUNÇÃO PARA MOSTRAR NOTIFICAÇÃO (TOAST)
+        // FUNÇÕES DE AUTENTICAÇÃO
+        function openAuthModal() { document.getElementById('modal-auth').classList.remove('hidden'); }
+        function closeAuthModal() { document.getElementById('modal-auth').classList.add('hidden'); }
+
+        async function loginGoogle() {
+            try {
+                await window.signInWithPopup(window.auth, window.provider);
+                closeAuthModal();
+                showToast("Bem-vindo axé!");
+            } catch (e) { showToast("Erro no login Google", "error"); }
+        }
+
+        async function loginEmail() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            try {
+                await window.signInWithEmailAndPassword(window.auth, email, pass);
+                closeAuthModal();
+                showToast("Login realizado!");
+            } catch (e) { showToast("E-mail ou senha incorretos", "error"); }
+        }
+
+        async function cadastroEmail() {
+            const email = document.getElementById('auth-email').value;
+            const pass = document.getElementById('auth-pass').value;
+            if(pass.length < 6) return showToast("Senha curta (mín. 6)", "error");
+            try {
+                await window.createUserWithEmailAndPassword(window.auth, email, pass);
+                showToast("Conta criada com sucesso!");
+                closeAuthModal();
+            } catch (e) { 
+                if(e.code === 'auth/email-already-in-use') showToast("E-mail já cadastrado!", "error");
+                else showToast("Erro ao cadastrar", "error");
+            }
+        }
+
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
             toast.className = `toast`;
             if(type === 'error') toast.style.borderLeftColor = '#991b1b';
-            
-            toast.innerHTML = `
-                <span>${type === 'success' ? '✨' : '⚠️'}</span>
-                <span>${message}</span>
-            `;
-            
+            toast.innerHTML = `<span>${type === 'success' ? '✨' : '⚠️'}</span><span>${message}</span>`;
             container.appendChild(toast);
             setTimeout(() => toast.classList.add('show'), 100);
-            
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => toast.remove(), 300);
@@ -293,48 +367,48 @@
                 return;
             }
 
+            // CARREGAR PRODUTOS (Público)
             const q = window.query(window.collection(window.db_online, "produtos"));
             window.onSnapshot(q, (querySnapshot) => {
                 db = [];
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    db.push({ 
-                        id: doc.id, 
-                        ...data,
-                        imagem: data.imagemUrl || data.imagem
-                    });
+                    db.push({ id: doc.id, ...data, imagem: data.imagemUrl || data.imagem });
                 });
                 renderizarVitrine(db);
-                console.log("Axé conectado!");
             });
 
-            const qVendas = window.query(window.collection(window.db_online, "vendas"));
-            window.onSnapshot(qVendas, (querySnapshot) => {
-                const listaPedidos = document.getElementById('lista-pedidos');
-                let htmlPedidos = "";
+            // CARREGAR PEDIDOS (Apenas do usuário logado)
+            if (window.userLogado) {
+                document.getElementById('alerta-login-pedidos').classList.add('hidden');
+                const qVendas = window.query(
+                    window.collection(window.db_online, "vendas"),
+                    window.where("userId", "==", window.userLogado.uid)
+                );
                 
-                querySnapshot.forEach((doc) => {
-                    const v = doc.data();
-                    htmlPedidos += `
-                        <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
-                            <td class="px-6 py-4 font-semibold">${v.itens}</td>
-                            <td class="px-6 py-4">R$ ${parseFloat(v.total).toFixed(2)}</td>
-                            <td class="px-6 py-4 text-stone-400">${v.data}</td>
-                            <td class="px-6 py-4">
-                                <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">
-                                    ${v.status || 'Pendente'}
-                                </span>
-                            </td>
-                        </tr>
-                    `;
+                window.onSnapshot(qVendas, (querySnapshot) => {
+                    const listaPedidos = document.getElementById('lista-pedidos');
+                    let htmlPedidos = "";
+                    querySnapshot.forEach((doc) => {
+                        const v = doc.data();
+                        htmlPedidos += `
+                            <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
+                                <td class="px-6 py-4 font-semibold">${v.itens}</td>
+                                <td class="px-6 py-4">R$ ${parseFloat(v.total).toFixed(2)}</td>
+                                <td class="px-6 py-4 text-stone-400">${v.data}</td>
+                                <td class="px-6 py-4">
+                                    <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">${v.status || 'Pendente'}</span>
+                                </td>
+                            </tr>`;
+                    });
+                    listaPedidos.innerHTML = htmlPedidos || `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic">Nenhum pedido encontrado.</td></tr>`;
                 });
+            }
+        }
 
-                if(htmlPedidos === "") {
-                    listaPedidos.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic">Você ainda não possui pedidos.</td></tr>`;
-                } else {
-                    listaPedidos.innerHTML = htmlPedidos;
-                }
-            });
+        function renderizarPedidosVazio() {
+            document.getElementById('alerta-login-pedidos').classList.remove('hidden');
+            document.getElementById('lista-pedidos').innerHTML = "";
         }
 
         function showSection(section) {
@@ -346,12 +420,10 @@
         function renderizarVitrine(lista = db) {
             const vitrine = document.getElementById('vitrine');
             if (!vitrine) return;
-            
             if(lista.length === 0) {
                 vitrine.innerHTML = `<p class="col-span-full text-center py-20 text-stone-400 uppercase text-[12px] tracking-widest">Nenhuma peça nesta coleção ainda.</p>`;
                 return;
             }
-
             vitrine.innerHTML = lista.map(p => `
                 <div class="product-card group">
                     <div class="relative aspect-square overflow-hidden rounded-[15px] mb-6 bg-stone-100">
@@ -361,18 +433,14 @@
                         <p class="text-[11px] uppercase tracking-widest text-orange-600 font-bold mb-1">${p.categoria || 'Arte Axé'}</p>
                         <h4 class="font-cinzel text-2xl text-stone-800 mb-2">${p.nome}</h4>
                         <p class="text-stone-800 text-lg font-semibold mb-4 italic">R$ ${parseFloat(p.preco).toFixed(2)}</p>
-                        <button onclick="addCart('${p.id}')" class="w-full btn-pill btn-outline text-[13px] hover:border-black hover:text-black transition-colors">
-                            Adicionar à Sacola
-                        </button>
+                        <button onclick="addCart('${p.id}')" class="w-full btn-pill btn-outline text-[13px] hover:border-black hover:text-black transition-colors">Adicionar à Sacola</button>
                     </div>
-                </div>
-            `).join('');
+                </div>`).join('');
         }
 
         function filtrarProdutos(cat) {
             const filtrados = cat === 'todos' ? db : db.filter(p => p.categoria.toUpperCase() === cat.toUpperCase());
             renderizarVitrine(filtrados);
-            
             document.getElementById('btn-filter-all').className = cat === 'todos' ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
             document.getElementById('btn-filter-guias').className = (cat.toUpperCase() === 'GUIAS') ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
         }
@@ -387,7 +455,7 @@
             if(prod) {
                 carrinho.push({...prod, cartId: Date.now()});
                 updateCartUI();
-                showToast(`${prod.nome} adicionado!`); // Substituído alert
+                showToast(`${prod.nome} na sacola!`);
                 if(!document.getElementById('cart-sidebar').classList.contains('open')) toggleCart();
             }
         }
@@ -396,7 +464,6 @@
             const container = document.getElementById('cart-items');
             document.getElementById('cart-count').innerText = carrinho.length;
             let total = 0;
-            
             if(carrinho.length === 0) {
                 container.innerHTML = `<p class="text-center text-stone-400 text-[12px] mt-10 uppercase tracking-widest">Sua sacola está vazia</p>`;
             } else {
@@ -420,14 +487,17 @@
             const nome = carrinho[i].nome;
             carrinho.splice(i, 1);
             updateCartUI();
-            showToast(`${nome} removido.`, 'error'); // Substituído alert
+            showToast(`${nome} removido.`, 'error');
         }
 
         async function finalizarWhatsApp() {
-            if(carrinho.length === 0) {
-                showToast("Sua sacola está vazia!", "error"); // Substituído alert
+            if (!window.userLogado) {
+                showToast("Faça login para finalizar", "error");
+                openAuthModal();
                 return;
             }
+
+            if(carrinho.length === 0) return showToast("Sua sacola está vazia!", "error");
             
             const numero = "5511984348036"; 
             let totalVenda = 0;
@@ -442,7 +512,8 @@
 
             try {
                 await window.addDoc(window.collection(window.db_online, "vendas"), {
-                    cliente: "Novo Cliente (WhatsApp)",
+                    userId: window.userLogado.uid,
+                    cliente: window.userLogado.displayName || window.userLogado.email,
                     itens: nomesItens,
                     total: totalVenda.toFixed(2),
                     data: new Date().toLocaleDateString('pt-BR'),
@@ -451,21 +522,16 @@
                 });
 
                 window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
-                
                 carrinho = [];
                 updateCartUI();
                 toggleCart();
-                showToast("Pedido enviado! Verifique o WhatsApp."); // Substituído alert
-                
+                showToast("Pedido registrado! Conclua no WhatsApp.");
             } catch (e) {
-                console.error("Erro ao registrar venda: ", e);
-                window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
+                showToast("Erro ao registrar pedido", "error");
             }
         }
 
-        window.onload = () => {
-            initFirebaseSync();
-        };
+        window.onload = () => { initFirebaseSync(); };
     </script>
 </body>
 </html>
