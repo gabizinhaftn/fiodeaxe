@@ -1,6 +1,6 @@
 // Configuração de acesso Restrito
 const ADMIN_CREDENTIALS = {
-    email: "gabiruela11@gmail.com", // Mantemos em minúsculo aqui para comparação
+    email: "fiodeaxe", // Mantemos em minúsculo aqui para comparação
     pass: "fiodeaxe2026" 
 };
 
