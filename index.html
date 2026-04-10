@@ -25,7 +25,6 @@
         const app = initializeApp(firebaseConfig);
         const db_online = getFirestore(app);
 
-        // Disponibiliza para o script global
         window.db_online = db_online;
         window.collection = collection;
         window.onSnapshot = onSnapshot;
@@ -129,9 +128,22 @@
             color: white;
         }
         .social-icon:hover { transform: translateY(-3px); opacity: 0.8; }
+
+        /* NOVOS ESTILOS PARA CAIXAS DE ALERTA */
+        #toast-container { position: fixed; bottom: 20px; left: 20px; z-index: 10001; }
+        .toast { 
+            background: #1a1a1a; color: white; padding: 16px 24px; border-radius: 12px; 
+            margin-top: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border-left: 4px solid #c5a059; font-size: 13px; font-weight: 600;
+            display: flex; align-items: center; gap: 12px;
+            transform: translateX(-120%); transition: transform 0.3s ease-out;
+        }
+        .toast.show { transform: translateX(0); }
     </style>
 </head>
 <body>
+
+    <div id="toast-container"></div>
 
     <div id="site-content">
         <nav class="grid grid-cols-2 md:grid-cols-3 items-center px-6 md:px-10 py-6 bg-white shadow-md sticky top-0">
@@ -254,14 +266,33 @@
         let db = []; 
         let carrinho = [];
 
-        // SINCRONIZAÇÃO COM FIREBASE (API ONLINE)
+        // FUNÇÃO PARA MOSTRAR NOTIFICAÇÃO (TOAST)
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast`;
+            if(type === 'error') toast.style.borderLeftColor = '#991b1b';
+            
+            toast.innerHTML = `
+                <span>${type === 'success' ? '✨' : '⚠️'}</span>
+                <span>${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
         function initFirebaseSync() {
             if (!window.db_online) {
                 setTimeout(initFirebaseSync, 500);
                 return;
             }
 
-            // Busca os produtos online
             const q = window.query(window.collection(window.db_online, "produtos"));
             window.onSnapshot(q, (querySnapshot) => {
                 db = [];
@@ -274,10 +305,9 @@
                     });
                 });
                 renderizarVitrine(db);
-                console.log("Axé conectado! Produtos atualizados.");
+                console.log("Axé conectado!");
             });
 
-            // Busca as vendas (pedidos) online para mostrar no "Meus Pedidos"
             const qVendas = window.query(window.collection(window.db_online, "vendas"));
             window.onSnapshot(qVendas, (querySnapshot) => {
                 const listaPedidos = document.getElementById('lista-pedidos');
@@ -357,6 +387,7 @@
             if(prod) {
                 carrinho.push({...prod, cartId: Date.now()});
                 updateCartUI();
+                showToast(`${prod.nome} adicionado!`); // Substituído alert
                 if(!document.getElementById('cart-sidebar').classList.contains('open')) toggleCart();
             }
         }
@@ -386,13 +417,17 @@
         }
 
         function removeItem(i) {
+            const nome = carrinho[i].nome;
             carrinho.splice(i, 1);
             updateCartUI();
+            showToast(`${nome} removido.`, 'error'); // Substituído alert
         }
 
-        // REGISTRA A VENDA NA API (FIREBASE) ANTES DE IR PRO WHATSAPP
         async function finalizarWhatsApp() {
-            if(carrinho.length === 0) return alert("Sua sacola está vazia!");
+            if(carrinho.length === 0) {
+                showToast("Sua sacola está vazia!", "error"); // Substituído alert
+                return;
+            }
             
             const numero = "5511984348036"; 
             let totalVenda = 0;
@@ -406,7 +441,6 @@
             mensagem += `\n*Total: R$ ${totalVenda.toFixed(2)}*`;
 
             try {
-                // Salva o registro da venda no Firebase para o Admin ver
                 await window.addDoc(window.collection(window.db_online, "vendas"), {
                     cliente: "Novo Cliente (WhatsApp)",
                     itens: nomesItens,
@@ -416,18 +450,15 @@
                     pagamento: "Pendente"
                 });
 
-                // Abre o WhatsApp
                 window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
                 
-                // Limpa o carrinho
                 carrinho = [];
                 updateCartUI();
                 toggleCart();
-                alert("Pedido enviado! Verifique o WhatsApp para combinar o pagamento.");
+                showToast("Pedido enviado! Verifique o WhatsApp."); // Substituído alert
                 
             } catch (e) {
                 console.error("Erro ao registrar venda: ", e);
-                // Se der erro na API, abre o zap mesmo assim
                 window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
             }
         }
