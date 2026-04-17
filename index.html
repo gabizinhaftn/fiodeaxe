@@ -476,11 +476,10 @@
                 setTimeout(initFirebaseSync, 500);
                 return;
             }
-        }
 
-            // 1. Sincronização da Vitrine (Mantida)
-            const q = window.query(window.collection(window.db_online, "produtos"));
-            window.onSnapshot(q, (querySnapshot) => {
+            // --- PARTE 1: VITRINE DE PRODUTOS (Restaurando a visibilidade) ---
+            const qProdutos = window.query(window.collection(window.db_online, "produtos"));
+            window.onSnapshot(qProdutos, (querySnapshot) => {
                 db = [];
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
@@ -492,10 +491,9 @@
                 });
                 renderizarVitrine(db);
                 if(typeof updateCartUI === "function") updateCartUI(); 
-            });
+            }, (error) => console.error("Erro vitrine:", error));
 
-            // 2. Sincronização dos Pedidos do Cliente
-            // Dentro de initFirebaseSync, substitua o bloco do window.userLogado por este:
+            // --- PARTE 2: MEUS PEDIDOS (Lógica do Cliente) ---
             if (window.userLogado) {
                 const alertaPedidos = document.getElementById('alerta-login-pedidos');
                 if(alertaPedidos) alertaPedidos.classList.add('hidden');
@@ -503,56 +501,51 @@
                 const listaPedidos = document.getElementById('lista-pedidos');
                 if(!listaPedidos) return;
 
-                // Filtro focado na coleção "vendas" (a mesma que o Admin lê)
-                // Importante: O campo no addDoc deve ser EXATAMENTE 'userId'
+                // Buscamos na coleção 'vendas', que é onde o Admin enxerga
                 const qVendas = window.query(
                     window.collection(window.db_online, "vendas"),
                     window.where("userId", "==", window.userLogado.uid)
                 );
                 
                 window.onSnapshot(qVendas, (querySnapshot) => {
-                    // Limpamos a tabela para garantir que não haja lixo visual
-                    listaPedidos.innerHTML = "";
-
                     if (querySnapshot.empty) {
                         listaPedidos.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic text-[11px]">Nenhum pedido encontrado.</td></tr>`;
                         return;
                     }
 
-                    // Criamos um array para ordenar por data (mais recentes primeiro)
-                    const pedidos = [];
+                    let htmlPedidos = "";
+                    const pedidosArr = [];
                     querySnapshot.forEach((doc) => {
-                        pedidos.push({ id: doc.id, ...doc.data() });
+                        pedidosArr.push({ id: doc.id, ...doc.data() });
                     });
 
-                    // Ordenação manual caso o Firebase não tenha índice de data pronto
-                    pedidos.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                    // Ordena para que o mais recente apareça primeiro
+                    pedidosArr.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
 
-                    let htmlFinal = "";
-                    pedidos.forEach((v) => {
-                        // Sincronia com os campos do Admin
-                        const statusExibicao = v.logistica || v.status || v.pagamento || 'Pendente';
-                        const valorTotal = v.total || v.valorTotal || 0;
-                        const dataPedido = v.data || new Date(v.timestamp?.seconds * 1000).toLocaleDateString('pt-BR') || '---';
+                    pedidosArr.forEach((v) => {
+                        const statusEx = v.logistica || v.status || v.pagamento || 'Pendente';
+                        const valorEx = v.total || v.valorTotal || 0;
 
-                        htmlFinal += `
+                        htmlPedidos += `
                             <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
                                 <td class="px-6 py-4 font-semibold text-[11px]">${v.itens || 'Produtos'}</td>
-                                <td class="px-6 py-4 text-[11px]">R$ ${parseFloat(valorTotal).toFixed(2)}</td>
-                                <td class="px-6 py-4 text-stone-400 text-[11px]">${dataPedido}</td>
+                                <td class="px-6 py-4 text-[11px]">R$ ${parseFloat(valorEx).toFixed(2)}</td>
+                                <td class="px-6 py-4 text-stone-400 text-[11px]">${v.data || '---'}</td>
                                 <td class="px-6 py-4">
-                                    <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">${statusExibicao}</span>
+                                    <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">${statusEx}</span>
                                 </td>
                             </tr>`;
                     });
-                    
-                    listaPedidos.innerHTML = htmlFinal;
-                }, (error) => {
-                    console.error("Erro ao carregar pedidos:", error);
-                    // Se der erro de permissão, o problema está nas Regras do Firestore
-                    listaPedidos.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-red-400 text-[10px]">Erro ao sincronizar dados.</td></tr>`;
-                });
+                    listaPedidos.innerHTML = htmlPedidos;
+                }, (error) => console.error("Erro pedidos cliente:", error));
+
+            } else {
+                // Se não houver usuário logado
+                if(typeof renderizarPedidosVazio === "function") {
+                    renderizarPedidosVazio();
+                }
             }
+        }
 
         function renderizarPedidosVazio() {
             const alerta = document.getElementById('alerta-login-pedidos');
