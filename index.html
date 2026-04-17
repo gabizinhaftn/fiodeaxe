@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Fio de Axé | Religiosidade & Arte</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="js/auth.js"></script>
@@ -53,15 +53,14 @@
         
         // Insere o texto na div que você criou no HTML
         if (saudacaoDiv) {
-            // Usamos 'block' e 'py-4' para garantir que o elemento ocupe seu próprio espaço vertical
             saudacaoDiv.innerHTML = `
-                <div class="block py-4 animate-fade-in">
-                    <h2 class="font-cinzel text-xl md:text-2xl text-stone-800 tracking-[4px]">
+                <div class="block py-4 px-2 animate-fade-in">
+                    <h2 class="font-cinzel text-lg md:text-2xl text-stone-800 tracking-[3px] break-words">
                         AXÉ, ${nomeUsuario.toUpperCase()}!
                     </h2>
-                    <p class="text-[11px] text-stone-500 uppercase tracking-[3px] mt-2">
+                    <p class="text-[9px] md:text-[11px] text-stone-500 uppercase tracking-[2px] mt-2">
                         Confira as peças selecionadas para você
-                    </p>
+                    </h2>
                 </div>
             `;
         }
@@ -651,9 +650,16 @@
 
             const urlWpp = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
             
-            // Tenta abrir e se falhar redireciona
-            const win = window.open(urlWpp, '_blank');
-            if(!win) window.location.href = urlWpp;
+            // --- AJUSTE PARA CELULAR (STABLE REDIRECT) ---
+            // Detecta se é celular para usar redirecionamento direto, evitando bloqueio de pop-up
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            
+            if (isMobile) {
+                window.location.href = urlWpp;
+            } else {
+                const win = window.open(urlWpp, '_blank');
+                if(!win) window.location.href = urlWpp;
+            }
 
             carrinho = [];
             // Verifica se a função existe antes de chamar para não travar o script
