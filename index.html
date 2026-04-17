@@ -496,29 +496,41 @@
                 const alertaPedidos = document.getElementById('alerta-login-pedidos');
                 if(alertaPedidos) alertaPedidos.classList.add('hidden');
                 
-                const qVendas = window.query(
-                    window.collection(window.db_online, "vendas"),
-                    window.where("userId", "==", window.userLogado.uid)
-                );
+                // Buscamos tanto na coleção 'vendas' quanto na 'pedidos' para garantir que nada escape
+                const colecoes = ["vendas", "pedidos"];
                 
-                window.onSnapshot(qVendas, (querySnapshot) => {
-                    const listaPedidos = document.getElementById('lista-pedidos');
-                    if(!listaPedidos) return;
+                colecoes.forEach(colecaoNome => {
+                    const qVendas = window.query(
+                        window.collection(window.db_online, colecaoNome),
+                        window.where("userId", "==", window.userLogado.uid)
+                    );
                     
-                    let htmlPedidos = "";
-                    querySnapshot.forEach((doc) => {
-                        const v = doc.data();
-                        htmlPedidos += `
-                            <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
-                                <td class="px-6 py-4 font-semibold text-[11px]">${v.itens}</td>
-                                <td class="px-6 py-4 text-[11px]">R$ ${parseFloat(v.total || 0).toFixed(2)}</td>
-                                <td class="px-6 py-4 text-stone-400 text-[11px]">${v.data}</td>
-                                <td class="px-6 py-4">
-                                    <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">${v.status || 'Pendente'}</span>
-                                </td>
-                            </tr>`;
+                    window.onSnapshot(qVendas, (querySnapshot) => {
+                        const listaPedidos = document.getElementById('lista-pedidos');
+                        if(!listaPedidos) return;
+                        
+                        let htmlPedidos = "";
+                        querySnapshot.forEach((doc) => {
+                            const v = doc.data();
+                            // Usamos o campo 'logistica' se existir, caso contrário 'status', para bater com o Admin
+                            const statusExibicao = v.logistica || v.status || 'Pendente'; 
+                            
+                            htmlPedidos += `
+                                <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
+                                    <td class="px-6 py-4 font-semibold text-[11px]">${v.itens}</td>
+                                    <td class="px-6 py-4 text-[11px]">R$ ${parseFloat(v.total || v.valorTotal || 0).toFixed(2)}</td>
+                                    <td class="px-6 py-4 text-stone-400 text-[11px]">${v.data}</td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">${statusExibicao}</span>
+                                    </td>
+                                </tr>`;
+                        });
+
+                        // Se houver resultados, atualiza a tela; se não, mantém o aviso de vazio
+                        if (querySnapshot.size > 0 || !listaPedidos.innerHTML.includes('tr')) {
+                            listaPedidos.innerHTML = htmlPedidos || `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic text-[11px]">Nenhum pedido encontrado.</td></tr>`;
+                        }
                     });
-                    listaPedidos.innerHTML = htmlPedidos || `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic text-[11px]">Nenhum pedido encontrado.</td></tr>`;
                 });
             } else {
                 renderizarPedidosVazio();
@@ -734,11 +746,12 @@
             }
 
             carrinho = [];
+            // Após zerar o array, atualizamos o armazenamento e a interface
             if(typeof salvarEAtualizar === "function") {
                 salvarEAtualizar();
             } else {
                 localStorage.setItem('cart_fio_de_axe', JSON.stringify(carrinho));
-                updateCartUI();
+                if(typeof updateCartUI === "function") updateCartUI();
             }
             
             toggleCart();
@@ -749,7 +762,9 @@
         window.finalizarCompra = window.finalizarWhatsApp;
 
         window.onload = () => { 
-            updateCartUI();
+            // Garante que a UI do carrinho inicie correta
+            if(typeof updateCartUI === "function") updateCartUI();
+            
             // Delay de 500ms para garantir que o Firebase Module (lá em cima) 
             // já exportou as funções para o window antes de rodar a vitrine
             setTimeout(() => {
