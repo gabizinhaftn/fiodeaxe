@@ -456,20 +456,29 @@
             renderizarLista(db.filter(p => p.nome.toLowerCase().includes(termo)));
         };
 
-        // --- ATUALIZAÇÃO DA CONTA DE FATURAMENTO ---
+        // --- ATUALIZAÇÃO DA CONTA DE FATURAMENTO (CORRIGIDO) ---
         function updateStats() {
             document.getElementById('stat-total-itens').innerText = db.length;
             
             // FILTRO: Somamos apenas se o pagamento for "Pago"
             const totalFaturado = listaVendasDB.reduce((acc, v) => {
                 if(v.pagamento === 'Pago') {
-                    let valorStr = v.total ? v.total.toString().replace('R$', '').replace('.', '').replace(',', '.').trim() : "0";
-                    return acc + (parseFloat(valorStr) || 0);
+                    // LIMPEZA DO VALOR: Remove caracteres de texto para somar números reais
+                    let valorStr = v.total ? v.total.toString() : "0";
+                    // 1. Remove "R$"
+                    // 2. Remove o ponto de milhar (ex: 4.000 -> 4000)
+                    // 3. Troca a vírgula por ponto (ex: 40,00 -> 40.00)
+                    let valorLimpo = valorStr.replace('R$', '')
+                                             .replace(/\./g, '') 
+                                             .replace(',', '.')
+                                             .trim();
+                    
+                    return acc + (parseFloat(valorLimpo) || 0);
                 }
                 return acc;
             }, 0);
             
-            document.getElementById('stat-faturamento').innerText = `R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('stat-faturamento').innerText = `R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             document.getElementById('stat-esgotados').innerText = db.filter(p => p.status === 'esgotado').length;
         }
 
