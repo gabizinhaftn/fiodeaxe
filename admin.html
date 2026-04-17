@@ -96,7 +96,7 @@
                 <span id="stat-total-itens" class="text-3xl font-bold font-cinzel">0</span>
             </div>
             <div class="bg-white p-6 rounded-lg border border-stone-100 shadow-sm text-center md:text-left">
-                <p class="text-[10px] uppercase text-stone-400 font-bold mb-1">Faturamento (Vendas)</p>
+                <p class="text-[10px] uppercase text-stone-400 font-bold mb-1">Faturamento (Vendas Pagas)</p>
                 <span id="stat-faturamento" class="text-3xl font-bold font-cinzel text-emerald-700">R$ 0,00</span>
             </div>
             <div class="bg-white p-6 rounded-lg border border-stone-100 shadow-sm text-center md:text-left">
@@ -279,7 +279,7 @@
         const fbDb = getFirestore(app);
         
         let db = [];
-        let listaVendasDB = []; // Variável global para armazenar vendas vindas do Firebase
+        let listaVendasDB = []; 
         let acaoPendente = null;
 
         // --- SISTEMA DE NOTIFICAÇÃO (TOAST) ---
@@ -456,12 +456,19 @@
             renderizarLista(db.filter(p => p.nome.toLowerCase().includes(termo)));
         };
 
+        // --- ATUALIZAÇÃO DA CONTA DE FATURAMENTO ---
         function updateStats() {
             document.getElementById('stat-total-itens').innerText = db.length;
+            
+            // FILTRO: Somamos apenas se o pagamento for "Pago"
             const totalFaturado = listaVendasDB.reduce((acc, v) => {
-                let valorStr = v.total ? v.total.toString().replace('R$', '').replace('.', '').replace(',', '.').trim() : "0";
-                return acc + (parseFloat(valorStr) || 0);
+                if(v.pagamento === 'Pago') {
+                    let valorStr = v.total ? v.total.toString().replace('R$', '').replace('.', '').replace(',', '.').trim() : "0";
+                    return acc + (parseFloat(valorStr) || 0);
+                }
+                return acc;
             }, 0);
+            
             document.getElementById('stat-faturamento').innerText = `R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
             document.getElementById('stat-esgotados').innerText = db.filter(p => p.status === 'esgotado').length;
         }
@@ -525,6 +532,7 @@
                     [campo]: valor
                 });
                 showToast("Venda atualizada com sucesso!");
+                // O onSnapshot cuidará de chamar o updateStats automaticamente
             } catch (e) {
                 showToast("Erro ao atualizar banco de dados.", "error");
             }
