@@ -456,29 +456,32 @@
             renderizarLista(db.filter(p => p.nome.toLowerCase().includes(termo)));
         };
 
-        // --- ATUALIZAÇÃO DA CONTA DE FATURAMENTO (CORRIGIDO) ---
+        // --- ATUALIZAÇÃO DA CONTA DE FATURAMENTO (ATUALIZADO PARA EVITAR ERRO DE MILHAR) ---
         function updateStats() {
             document.getElementById('stat-total-itens').innerText = db.length;
             
-            // FILTRO: Somamos apenas se o pagamento for "Pago"
             const totalFaturado = listaVendasDB.reduce((acc, v) => {
-                if(v.pagamento === 'Pago') {
-                    // LIMPEZA DO VALOR: Remove caracteres de texto para somar números reais
+                if(v.pagamento && v.pagamento.toLowerCase() === 'pago') {
                     let valorStr = v.total ? v.total.toString() : "0";
-                    // 1. Remove "R$"
-                    // 2. Remove o ponto de milhar (ex: 4.000 -> 4000)
-                    // 3. Troca a vírgula por ponto (ex: 40,00 -> 40.00)
-                    let valorLimpo = valorStr.replace('R$', '')
-                                             .replace(/\./g, '') 
-                                             .replace(',', '.')
-                                             .trim();
                     
-                    return acc + (parseFloat(valorLimpo) || 0);
+                    // Remove "R$", espaços e trata pontuação brasileira
+                    let valorLimpo = valorStr.replace('R$', '').replace(/\s/g, '');
+                    
+                    // Se o valor tem vírgula e ponto (ex: 1.200,00), remove o ponto e troca a vírgula
+                    if (valorLimpo.includes(',') && valorLimpo.includes('.')) {
+                        valorLimpo = valorLimpo.replace(/\./g, '').replace(',', '.');
+                    } else {
+                        // Se tem só vírgula (ex: 40,00), troca por ponto
+                        valorLimpo = valorLimpo.replace(',', '.');
+                    }
+                    
+                    const valorNum = parseFloat(valorLimpo) || 0;
+                    return acc + valorNum;
                 }
                 return acc;
             }, 0);
             
-            document.getElementById('stat-faturamento').innerText = `R$ ${totalFaturado.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('stat-faturamento').innerText = totalFaturado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
             document.getElementById('stat-esgotados').innerText = db.filter(p => p.status === 'esgotado').length;
         }
 
@@ -541,7 +544,6 @@
                     [campo]: valor
                 });
                 showToast("Venda atualizada com sucesso!");
-                // O onSnapshot cuidará de chamar o updateStats automaticamente
             } catch (e) {
                 showToast("Erro ao atualizar banco de dados.", "error");
             }
