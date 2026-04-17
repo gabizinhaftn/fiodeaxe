@@ -492,14 +492,16 @@
                 updateCartUI(); 
             });
 
+            // Dentro da função initFirebaseSync, na parte do window.userLogado:
             if (window.userLogado) {
                 const alertaPedidos = document.getElementById('alerta-login-pedidos');
                 if(alertaPedidos) alertaPedidos.classList.add('hidden');
                 
-                // Buscamos tanto na coleção 'vendas' quanto na 'pedidos' para garantir que nada escape
+                // Lista de coleções para monitorar
                 const colecoes = ["vendas", "pedidos"];
                 
                 colecoes.forEach(colecaoNome => {
+                    // Criamos a query buscando pelo ID do usuário
                     const qVendas = window.query(
                         window.collection(window.db_online, colecaoNome),
                         window.where("userId", "==", window.userLogado.uid)
@@ -509,29 +511,39 @@
                         const listaPedidos = document.getElementById('lista-pedidos');
                         if(!listaPedidos) return;
                         
-                        let htmlPedidos = "";
-                        querySnapshot.forEach((doc) => {
-                            const v = doc.data();
-                            // Usamos o campo 'logistica' se existir, caso contrário 'status', para bater com o Admin
-                            const statusExibicao = v.logistica || v.status || 'Pendente'; 
-                            
-                            htmlPedidos += `
-                                <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
-                                    <td class="px-6 py-4 font-semibold text-[11px]">${v.itens}</td>
-                                    <td class="px-6 py-4 text-[11px]">R$ ${parseFloat(v.total || v.valorTotal || 0).toFixed(2)}</td>
-                                    <td class="px-6 py-4 text-stone-400 text-[11px]">${v.data}</td>
-                                    <td class="px-6 py-4">
-                                        <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">${statusExibicao}</span>
-                                    </td>
-                                </tr>`;
+                        // Se for a primeira coleção ou estiver vazio, limpamos o "Nenhum pedido encontrado"
+                        if (listaPedidos.innerHTML.includes("Nenhum pedido")) {
+                            listaPedidos.innerHTML = "";
+                        }
+
+                        querySnapshot.docChanges().forEach((change) => {
+                            if (change.type === "added" || change.type === "modified") {
+                                const v = change.doc.data();
+                                const pedidoId = change.doc.id;
+                                
+                                // Verifica se esse pedido já está na tabela para não duplicar
+                                if (!document.getElementById(`pedido-${pedidoId}`)) {
+                                    const statusExibicao = v.logistica || v.status || 'Pendente';
+                                    const novaLinha = `
+                                        <tr id="pedido-${pedidoId}" class="border-b border-stone-50 hover:bg-stone-50 transition">
+                                            <td class="px-6 py-4 font-semibold text-[11px]">${v.itens}</td>
+                                            <td class="px-6 py-4 text-[11px]">R$ ${parseFloat(v.total || v.valorTotal || 0).toFixed(2)}</td>
+                                            <td class="px-6 py-4 text-stone-400 text-[11px]">${v.data}</td>
+                                            <td class="px-6 py-4">
+                                                <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">${statusExibicao}</span>
+                                            </td>
+                                        </tr>`;
+                                    listaPedidos.insertAdjacentHTML('afterbegin', novaLinha);
+                                }
+                            }
                         });
 
-                        // Se houver resultados, atualiza a tela; se não, mantém o aviso de vazio
-                        if (querySnapshot.size > 0 || !listaPedidos.innerHTML.includes('tr')) {
-                            listaPedidos.innerHTML = htmlPedidos || `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic text-[11px]">Nenhum pedido encontrado.</td></tr>`;
+                        if (listaPedidos.innerHTML === "") {
+                            listaPedidos.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic text-[11px]">Nenhum pedido encontrado.</td></tr>`;
                         }
                     });
                 });
+            
             } else {
                 renderizarPedidosVazio();
             }
@@ -711,30 +723,33 @@
 
             try {
                 if (window.db_online && window.addDoc) {
-                    // Criamos o objeto do pedido com os campos exatos do seu painel administrativo
                     const dadosPedido = {
                         userId: window.userLogado.uid,
-                        uid: window.userLogado.uid, // Campo UID para facilitar o filtro do cliente
+                        uid: window.userLogado.uid,
                         cliente: window.userLogado.displayName || window.userLogado.email,
                         itens: nomesString,
                         total: totalVenda.toFixed(2),
-                        valorTotal: totalVenda.toFixed(2), // Compatibilidade com tabela de vendas
+                        valorTotal: totalVenda.toFixed(2),
                         data: new Date().toLocaleDateString('pt-BR'),
-                        status: "Aguardando Pagamento", // Status que o cliente verá
-                        pagamento: "PENDENTE", // Status financeiro
-                        logistica: "AGUARDANDO PAGAMENTO", // Status de logística como na imagem
+                        status: "Aguardando Pagamento",
+                        pagamento: "PENDENTE",
+                        logistica: "AGUARDANDO PAGAMENTO",
                         timestamp: new Date()
                     };
 
-                    // Salva na coleção 'vendas' para o Admin
+                    // AGUARDAR o salvamento antes de qualquer outra ação
                     await window.addDoc(window.collection(window.db_online, "vendas"), dadosPedido);
-                    
-                    // Salva também na coleção 'pedidos' para garantir que apareça em "Meus Pedidos" do cliente
                     await window.addDoc(window.collection(window.db_online, "pedidos"), dadosPedido);
+                    
+                    console.log("Pedido salvo com sucesso!");
                 }
-            } catch (e) { console.error("Erro banco:", e); }
+            } catch (e) { 
+                console.error("Erro ao salvar:", e); 
+            }
 
+            // SÓ DEPOIS DE SALVAR, FAZ O REDIRECIONAMENTO
             const urlWpp = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+            // ... resto do código de redirecionamento
             
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             
