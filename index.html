@@ -7,11 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="js/auth.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
-    
+     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, query, addDoc, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, query, addDoc, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBwW7An4b8M6WHFB5PNXBKXFDNZ5Nw1fIY",
@@ -28,6 +28,7 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
+        // Expõe funções ao escopo global
         window.db_online = db_online;
         window.collection = collection;
         window.onSnapshot = onSnapshot;
@@ -35,24 +36,28 @@
         window.addDoc = addDoc;
         window.where = where;
         window.auth = auth;
-        window.signInWithPopup = signInWithPopup;
         window.provider = provider;
+        window.signInWithPopup = signInWithPopup;
+        window.signInWithRedirect = signInWithRedirect; // Fallback para domínios chatos
         window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
         window.signInWithEmailAndPassword = signInWithEmailAndPassword;
-        window.signOut = signOut;
 
-        // Monitor de estado de login
         onAuthStateChanged(auth, (user) => {
             window.userLogado = user;
             const btnLogin = document.getElementById('btn-login-nav');
             if (user) {
-                btnLogin.innerHTML = `Sair (${user.displayName || user.email.split('@')[0]})`;
-                btnLogin.onclick = () => auth.signOut();
+                if(btnLogin) {
+                    btnLogin.innerHTML = `Sair (${user.displayName || user.email.split('@')[0]})`;
+                    btnLogin.onclick = () => auth.signOut().then(() => window.location.reload());
+                }
                 initFirebaseSync(); 
             } else {
-                btnLogin.innerHTML = `Entrar / Cadastro`;
-                btnLogin.onclick = () => openAuthModal();
+                if(btnLogin) {
+                    btnLogin.innerHTML = `Entrar / Cadastro`;
+                    btnLogin.onclick = () => openAuthModal();
+                }
                 renderizarPedidosVazio();
+                initFirebaseSync();
             }
         });
     </script>
@@ -63,6 +68,7 @@
             background-color: #f2f2f2; 
             color: #1a1a1a;
             position: relative;
+            scroll-behavior: smooth;
         }
 
         body::before {
@@ -99,9 +105,12 @@
             text-transform: uppercase;
             letter-spacing: 1px;
             transition: all 0.3s;
+            cursor: pointer;
         }
         .btn-dark { background: #1a1a1a; color: white; }
+        .btn-dark:hover { background: #333; transform: scale(1.02); }
         .btn-outline { border: 1px solid #e5e7eb; color: #9ca3af; background: white; }
+        .btn-outline:hover { border-color: #1a1a1a; color: #1a1a1a; }
 
         #cart-sidebar { 
             transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); 
@@ -176,7 +185,7 @@
             <h3 class="font-cinzel text-2xl mb-6 text-center text-stone-800">Identifique-se</h3>
             
             <button onclick="loginGoogle()" class="w-full border p-3 rounded-xl flex items-center justify-center gap-3 mb-6 hover:bg-stone-50 transition font-bold text-stone-700">
-                <img src="https://www.google.com/favicon.ico" class="w-5"> Continuar com Google
+                <img src="https://www.google.com/favicon.ico" class="w-5" alt="Google"> Continuar com Google
             </button>
 
             <div class="relative mb-6 text-center">
@@ -295,7 +304,7 @@
     <aside id="cart-sidebar" class="fixed right-0 top-0 h-full w-full max-w-sm bg-white shadow-2xl p-8 flex flex-col">
         <div class="flex justify-between items-center mb-10">
             <h3 class="font-cinzel text-2xl">Sacola</h3>
-            <button onclick="toggleCart()" class="text-2xl">&times;</button>
+            <button onclick="toggleCart()" class="text-2xl hover:text-orange-600 transition">&times;</button>
         </div>
         <div id="cart-items" class="flex-1 overflow-y-auto space-y-6"></div>
         <div class="border-t pt-6 mt-6">
@@ -309,18 +318,28 @@
 
     <script>
         let db = []; 
-        let carrinho = [];
-
+        let carrinho = JSON.parse(localStorage.getItem('cart_fio_de_axe')) || [];
+        
         // FUNÇÕES DE AUTENTICAÇÃO
         function openAuthModal() { document.getElementById('modal-auth').classList.remove('hidden'); }
         function closeAuthModal() { document.getElementById('modal-auth').classList.add('hidden'); }
 
         async function loginGoogle() {
             try {
+                // Tenta o método normal de pop-up
                 await window.signInWithPopup(window.auth, window.provider);
                 closeAuthModal();
                 showToast("Bem-vindo axé!");
-            } catch (e) { showToast("Erro no login Google", "error"); }
+            } catch (e) { 
+                console.error("Erro no login:", e);
+                // Se o domínio for o problema (127.0.0.1 vs localhost), tenta redirecionar
+                if (e.code === 'auth/unauthorized-domain' || e.code === 'auth/popup-blocked') {
+                    showToast("Redirecionando para login seguro...");
+                    window.signInWithRedirect(window.auth, window.provider);
+                } else {
+                    showToast("Erro ao autenticar com Google", "error");
+                }
+            }
         }
 
         async function loginEmail() {
@@ -349,6 +368,7 @@
 
         function showToast(message, type = 'success') {
             const container = document.getElementById('toast-container');
+            if(!container) return;
             const toast = document.createElement('div');
             toast.className = `toast`;
             if(type === 'error') toast.style.borderLeftColor = '#991b1b';
@@ -367,20 +387,25 @@
                 return;
             }
 
-            // CARREGAR PRODUTOS (Público)
             const q = window.query(window.collection(window.db_online, "produtos"));
             window.onSnapshot(q, (querySnapshot) => {
                 db = [];
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    db.push({ id: doc.id, ...data, imagem: data.imagemUrl || data.imagem });
+                    db.push({ 
+                        id: doc.id, 
+                        ...data, 
+                        imagem: data.imagem_url || data.imagem || 'https://via.placeholder.com/400' 
+                    });
                 });
                 renderizarVitrine(db);
+                updateCartUI(); 
             });
 
-            // CARREGAR PEDIDOS (Apenas do usuário logado)
             if (window.userLogado) {
-                document.getElementById('alerta-login-pedidos').classList.add('hidden');
+                const alertaPedidos = document.getElementById('alerta-login-pedidos');
+                if(alertaPedidos) alertaPedidos.classList.add('hidden');
+                
                 const qVendas = window.query(
                     window.collection(window.db_online, "vendas"),
                     window.where("userId", "==", window.userLogado.uid)
@@ -388,150 +413,244 @@
                 
                 window.onSnapshot(qVendas, (querySnapshot) => {
                     const listaPedidos = document.getElementById('lista-pedidos');
+                    if(!listaPedidos) return;
+                    
                     let htmlPedidos = "";
                     querySnapshot.forEach((doc) => {
                         const v = doc.data();
                         htmlPedidos += `
                             <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
-                                <td class="px-6 py-4 font-semibold">${v.itens}</td>
-                                <td class="px-6 py-4">R$ ${parseFloat(v.total).toFixed(2)}</td>
-                                <td class="px-6 py-4 text-stone-400">${v.data}</td>
+                                <td class="px-6 py-4 font-semibold text-[11px]">${v.itens}</td>
+                                <td class="px-6 py-4 text-[11px]">R$ ${parseFloat(v.total || 0).toFixed(2)}</td>
+                                <td class="px-6 py-4 text-stone-400 text-[11px]">${v.data}</td>
                                 <td class="px-6 py-4">
                                     <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-[10px] font-bold uppercase tracking-wider">${v.status || 'Pendente'}</span>
                                 </td>
                             </tr>`;
                     });
-                    listaPedidos.innerHTML = htmlPedidos || `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic">Nenhum pedido encontrado.</td></tr>`;
+                    listaPedidos.innerHTML = htmlPedidos || `<tr><td colspan="4" class="px-6 py-12 text-center text-stone-400 italic text-[11px]">Nenhum pedido encontrado.</td></tr>`;
                 });
+            } else {
+                renderizarPedidosVazio();
             }
         }
 
         function renderizarPedidosVazio() {
-            document.getElementById('alerta-login-pedidos').classList.remove('hidden');
-            document.getElementById('lista-pedidos').innerHTML = "";
+            const alerta = document.getElementById('alerta-login-pedidos');
+            if(alerta) alerta.classList.remove('hidden');
+            const lista = document.getElementById('lista-pedidos');
+            if(lista) lista.innerHTML = "";
         }
 
         function showSection(section) {
-            document.getElementById('section-home').classList.toggle('hidden-section', section !== 'home');
-            document.getElementById('section-pedidos').classList.toggle('hidden-section', section !== 'pedidos');
+            const home = document.getElementById('section-home');
+            const pedidos = document.getElementById('section-pedidos');
+            const navHome = document.getElementById('nav-home');
+            const navPedidos = document.getElementById('nav-pedidos');
+
+            if(home) home.classList.toggle('hidden', section !== 'home');
+            if(pedidos) pedidos.classList.toggle('hidden', section !== 'pedidos');
+            
+            if(navHome) navHome.classList.toggle('text-stone-900', section === 'home');
+            if(navPedidos) navPedidos.classList.toggle('text-stone-900', section === 'pedidos');
+            
             window.scrollTo({top: 0, behavior: 'smooth'});
         }
 
         function renderizarVitrine(lista = db) {
             const vitrine = document.getElementById('vitrine');
             if (!vitrine) return;
+            
             if(lista.length === 0) {
-                vitrine.innerHTML = `<p class="col-span-full text-center py-20 text-stone-400 uppercase text-[12px] tracking-widest">Nenhuma peça nesta coleção ainda.</p>`;
+                vitrine.innerHTML = `<p class="col-span-full text-center py-20 text-stone-400 uppercase text-[12px] tracking-widest">Buscando coleção no Axé...</p>`;
                 return;
             }
+            
             vitrine.innerHTML = lista.map(p => `
                 <div class="product-card group">
-                    <div class="relative aspect-square overflow-hidden rounded-[15px] mb-6 bg-stone-100">
-                        <img src="${p.imagem}" class="w-full h-full object-cover transition duration-500 group-hover:scale-110" onerror="this.src='https://via.placeholder.com/400x400?text=Imagem+Indisponivel'">
+                    <div class="relative aspect-[3/4] overflow-hidden rounded-[15px] mb-6 bg-stone-100 shadow-inner">
+                        <img src="${p.imagem}" class="w-full h-full object-cover transition duration-500 group-hover:scale-110" onerror="this.src='https://via.placeholder.com/400x533?text=Imagem+Indisponivel'">
                     </div>
                     <div class="text-center px-2">
-                        <p class="text-[11px] uppercase tracking-widest text-orange-600 font-bold mb-1">${p.categoria || 'Arte Axé'}</p>
-                        <h4 class="font-cinzel text-2xl text-stone-800 mb-2">${p.nome}</h4>
-                        <p class="text-stone-800 text-lg font-semibold mb-4 italic">R$ ${parseFloat(p.preco).toFixed(2)}</p>
-                        <button onclick="addCart('${p.id}')" class="w-full btn-pill btn-outline text-[13px] hover:border-black hover:text-black transition-colors">Adicionar à Sacola</button>
+                        <p class="text-[10px] uppercase tracking-widest text-orange-600 font-bold mb-1">${p.categoria || 'Arte Axé'}</p>
+                        <h4 class="font-cinzel text-xl text-stone-800 mb-2 truncate">${p.nome}</h4>
+                        <p class="text-stone-800 text-lg font-semibold mb-4 italic">R$ ${parseFloat(p.preco || 0).toFixed(2)}</p>
+                        <button onclick="addCart('${p.id}')" class="w-full border border-stone-800 py-3 text-[11px] font-bold uppercase tracking-widest hover:bg-stone-800 hover:text-white transition-all">Adicionar à Sacola</button>
                     </div>
                 </div>`).join('');
         }
 
         function filtrarProdutos(cat) {
-            const filtrados = cat === 'todos' ? db : db.filter(p => p.categoria.toUpperCase() === cat.toUpperCase());
+            const filtrados = cat === 'todos' ? db : db.filter(p => p.categoria?.toUpperCase() === cat.toUpperCase());
             renderizarVitrine(filtrados);
-            document.getElementById('btn-filter-all').className = cat === 'todos' ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
-            document.getElementById('btn-filter-guias').className = (cat.toUpperCase() === 'GUIAS') ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
+            
+            const btnAll = document.getElementById('btn-filter-all');
+            const btnGuias = document.getElementById('btn-filter-guias');
+            
+            if(btnAll) btnAll.className = cat === 'todos' ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
+            if(btnGuias) btnGuias.className = (cat.toUpperCase() === 'GUIAS') ? "btn-pill btn-dark shadow-lg shadow-black/20" : "btn-pill btn-outline";
         }
 
         function toggleCart() {
-            document.getElementById('cart-sidebar').classList.toggle('open');
-            document.getElementById('cart-overlay').classList.toggle('hidden');
+            const sidebar = document.getElementById('cart-sidebar');
+            const overlay = document.getElementById('cart-overlay');
+            if(sidebar) sidebar.classList.toggle('open');
+            if(overlay) overlay.classList.toggle('hidden');
         }
 
         function addCart(id) {
             const prod = db.find(p => p.id === id);
             if(prod) {
-                carrinho.push({...prod, cartId: Date.now()});
-                updateCartUI();
+                const itemExistente = carrinho.find(item => item.id === id);
+                if(itemExistente) {
+                    itemExistente.quantidade += 1;
+                } else {
+                    carrinho.push({
+                        id: prod.id,
+                        nome: prod.nome,
+                        preco: parseFloat(prod.preco || 0),
+                        imagem: prod.imagem,
+                        quantidade: 1
+                    });
+                }
+                
+                salvarEAtualizar();
                 showToast(`${prod.nome} na sacola!`);
-                if(!document.getElementById('cart-sidebar').classList.contains('open')) toggleCart();
+                const sidebar = document.getElementById('cart-sidebar');
+                if(sidebar && !sidebar.classList.contains('open')) toggleCart();
             }
         }
 
-        function updateCartUI() {
-            const container = document.getElementById('cart-items');
-            document.getElementById('cart-count').innerText = carrinho.length;
-            let total = 0;
-            if(carrinho.length === 0) {
-                container.innerHTML = `<p class="text-center text-stone-400 text-[12px] mt-10 uppercase tracking-widest">Sua sacola está vazia</p>`;
-            } else {
-                container.innerHTML = carrinho.map((p, i) => {
-                    total += parseFloat(p.preco);
-                    return `
-                    <div class="flex gap-4 items-center border-b border-stone-50 pb-4">
-                        <img src="${p.imagem}" class="w-16 h-16 object-cover rounded-lg">
-                        <div class="flex-1">
-                            <h5 class="text-[12px] font-bold uppercase tracking-tighter">${p.nome}</h5>
-                            <p class="text-stone-400 text-sm">R$ ${parseFloat(p.preco).toFixed(2)}</p>
-                        </div>
-                        <button onclick="removeItem(${i})" class="text-stone-300 hover:text-red-500 transition-colors text-xl">&times;</button>
-                    </div>`;
-                }).join('');
+        function alterarQtd(index, delta) {
+            carrinho[index].quantidade += delta;
+            if(carrinho[index].quantidade <= 0) {
+                carrinho.splice(index, 1);
             }
-            document.getElementById('cart-total').innerText = `R$ ${total.toFixed(2)}`;
+            salvarEAtualizar();
         }
 
         function removeItem(i) {
             const nome = carrinho[i].nome;
             carrinho.splice(i, 1);
-            updateCartUI();
+            salvarEAtualizar();
             showToast(`${nome} removido.`, 'error');
         }
 
-        async function finalizarWhatsApp() {
-            if (!window.userLogado) {
-                showToast("Faça login para finalizar", "error");
-                openAuthModal();
-                return;
-            }
-
-            if(carrinho.length === 0) return showToast("Sua sacola está vazia!", "error");
-            
-            const numero = "5511984348036"; 
-            let totalVenda = 0;
-            let nomesItens = carrinho.map(p => p.nome).join(', ');
-            let mensagem = `Olá! Gostaria de encomendar os seguintes itens:\n\n`;
-            
-            carrinho.forEach(p => {
-                mensagem += `• ${p.nome} - R$ ${parseFloat(p.preco).toFixed(2)}\n`;
-                totalVenda += parseFloat(p.preco);
-            });
-            mensagem += `\n*Total: R$ ${totalVenda.toFixed(2)}*`;
-
-            try {
-                await window.addDoc(window.collection(window.db_online, "vendas"), {
-                    userId: window.userLogado.uid,
-                    cliente: window.userLogado.displayName || window.userLogado.email,
-                    itens: nomesItens,
-                    total: totalVenda.toFixed(2),
-                    data: new Date().toLocaleDateString('pt-BR'),
-                    status: "Aguardando Pagamento",
-                    pagamento: "Pendente"
-                });
-
-                window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensagem)}`, '_blank');
-                carrinho = [];
-                updateCartUI();
-                toggleCart();
-                showToast("Pedido registrado! Conclua no WhatsApp.");
-            } catch (e) {
-                showToast("Erro ao registrar pedido", "error");
-            }
+        function salvarEAtualizar() {
+            localStorage.setItem('cart_fio_de_axe', JSON.stringify(carrinho));
+            updateCartUI();
         }
 
-        window.onload = () => { initFirebaseSync(); };
+        function updateCartUI() {
+            const container = document.getElementById('cart-items');
+            const countElement = document.getElementById('cart-count');
+            const totalElement = document.getElementById('cart-total');
+            
+            let total = 0;
+            let totalItens = 0;
+
+            if(!container) return;
+
+            if(carrinho.length === 0) {
+                container.innerHTML = `<p class="text-center text-stone-400 text-[12px] mt-20 uppercase tracking-widest">Sua sacola está vazia</p>`;
+            } else {
+                container.innerHTML = carrinho.map((p, i) => {
+                    const precoSeguro = parseFloat(p.preco || 0);
+                    const qtdSegura = parseInt(p.quantidade || 1);
+                    const subtotal = precoSeguro * qtdSegura;
+                    total += subtotal;
+                    totalItens += qtdSegura;
+                    return `
+                    <div class="flex gap-4 items-center border-b border-stone-50 pb-4 mb-4">
+                        <img src="${p.imagem}" class="w-14 h-16 object-cover rounded-lg">
+                        <div class="flex-1">
+                            <h5 class="text-[11px] font-bold uppercase tracking-tighter mb-1">${p.nome}</h5>
+                            <div class="flex items-center gap-3 mt-2">
+                                <button onclick="alterarQtd(${i}, -1)" class="w-5 h-5 border flex items-center justify-center text-[10px]">-</button>
+                                <span class="text-[11px] font-bold">${qtdSegura}</span>
+                                <button onclick="alterarQtd(${i}, 1)" class="w-5 h-5 border flex items-center justify-center text-[10px]">+</button>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold text-[11px]">R$ ${subtotal.toFixed(2)}</p>
+                            <button onclick="removeItem(${i})" class="text-[9px] text-red-500 uppercase font-bold mt-2">Remover</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+            
+            if(countElement) countElement.innerText = totalItens;
+            if(totalElement) totalElement.innerText = `R$ ${total.toFixed(2)}`;
+        }
+
+ // --- FUNÇÃO FINALIZAR (RESTAURADA E CORRIGIDA) ---
+        // Adicionei ambos os nomes (finalizarWhatsApp e finalizarCompra) para garantir que funcione
+        window.finalizarWhatsApp = async () => {
+            if (carrinho.length === 0) return showToast("Sua sacola está vazia!");
+            if (!window.userLogado) {
+                openAuthModal();
+                return showToast("Faça login para concluir", "error");
+            }
+                    
+            const numero = "5511984348036"; 
+            let totalVenda = 0;
+            let resumoItens = "";
+            let nomesString = carrinho.map(p => `${p.nome} (${p.quantidade}x)`).join(', ');
+            
+            carrinho.forEach(p => {
+                const sub = parseFloat(p.preco || 0) * parseInt(p.quantidade || 1);
+                resumoItens += `• ${p.nome} (${p.quantidade}x) - R$ ${sub.toFixed(2)}\n`;
+                totalVenda += sub;
+            });
+
+            const mensagem = `*PEDIDO FIO DE AXÉ*\n\n*Cliente:* ${window.userLogado.displayName || window.userLogado.email}\n\n*Itens:*\n${resumoItens}\n*Total: R$ ${totalVenda.toFixed(2)}*`;
+
+            try {
+                if (window.db_online && window.addDoc) {
+                    await window.addDoc(window.collection(window.db_online, "vendas"), {
+                        userId: window.userLogado.uid,
+                        cliente: window.userLogado.displayName || window.userLogado.email,
+                        itens: nomesString,
+                        total: totalVenda.toFixed(2),
+                        data: new Date().toLocaleDateString('pt-BR'),
+                        status: "Aguardando Pagamento",
+                        timestamp: new Date()
+                    });
+                }
+            } catch (e) { console.error("Erro banco:", e); }
+
+            const urlWpp = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
+            
+            // Tenta abrir e se falhar redireciona
+            const win = window.open(urlWpp, '_blank');
+            if(!win) window.location.href = urlWpp;
+
+            carrinho = [];
+            // Verifica se a função existe antes de chamar para não travar o script
+            if(typeof salvarEAtualizar === "function") {
+                salvarEAtualizar();
+            } else {
+                localStorage.setItem('cart_fio_de_axe', JSON.stringify(carrinho));
+                updateCartUI();
+            }
+            
+            toggleCart();
+            showToast("Redirecionando...");
+        }
+
+        // Criando um alias caso o HTML chame finalizarCompra
+        window.finalizarCompra = window.finalizarWhatsApp;
+
+        window.onload = () => { 
+            updateCartUI();
+            // Delay de 500ms para garantir que o Firebase Module (lá em cima) 
+            // já exportou as funções para o window antes de rodar a vitrine
+            setTimeout(() => {
+                if(typeof initFirebaseSync === "function") {
+                    initFirebaseSync();
+                }
+            }, 500); 
+        };
     </script>
 </body>
 </html>

@@ -1,8 +1,19 @@
+/* ARQUIVO DE ESTILOS CENTRALIZADO - FIO DE AXÉ
+    Melhorias: Reset de box-sizing, variáveis semânticas e utilitários de espaçamento.
+*/
+
 :root {
     --cor-primaria: #1a241b;
     --cor-destaque: #c5a059;
     --cor-terra: #8b4513;
     --fundo-creme: #fdfbf7;
+    --transicao: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 
 body { 
@@ -10,71 +21,73 @@ body {
     background-color: var(--fundo-creme);
     background-image: url('https://www.transparenttextures.com/patterns/natural-paper.png');
     color: var(--cor-primaria);
-    font-size: 16px; /* Tamanho base aumentado para leitura geral */
+    line-height: 1.6;
+    overflow-x: hidden;
 }
 
 h1, h2, h3, .font-cinzel { 
     font-family: 'Cinzel', serif; 
-    letter-spacing: 0.1em;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
 }
 
-/* --- Aumento de Fontes Específicas --- */
-
-/* Menu de Navegação */
-nav button, nav a {
-    font-size: 14px !important; /* Aumentado de 10px para 14px */
-    font-weight: 700;
+/* Header & Nav */
+nav {
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(5px);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    transition: var(--transicao);
 }
 
-/* Títulos dos Cards */
-.product-card h4, .card-produto h4 {
-    font-size: 1.3rem !important; /* Destaque maior no nome do produto */
-    margin-bottom: 0.5rem;
-}
-
-/* Preços */
-.product-card p.font-semibold, .card-produto .preco {
-    font-size: 1.15rem !important; /* Valor mais visível */
-    color: var(--cor-terra);
-}
-
-/* Categorias e Textos Auxiliares */
-.product-card p.uppercase, .card-produto .categoria {
-    font-size: 11px !important; /* Aumentado de 9px para 11px */
-    letter-spacing: 2px;
-}
-
-/* --- Efeitos Originais Preservados --- */
-
+/* Cards de Produto */
 .card-produto {
-    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    background: white;
+    padding: 15px;
+    border: 1px solid transparent;
+    transition: var(--transicao);
 }
 
 .card-produto:hover {
-    transform: translateY(-5px);
+    border-color: var(--cor-destaque);
+    transform: translateY(-8px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.05);
 }
 
-/* --- AJUSTES DE CORREÇÃO (Scroll/Sobreposição) --- */
-
-nav {
-    /* Garante que o menu tenha fundo sólido ao descer a tela */
-    background-color: white !important; 
-    /* Coloca o menu na frente de qualquer outro elemento */
-    z-index: 1000 !important;
-    /* Garante que ele preencha a largura e fique no topo */
-    position: sticky;
-    top: 0;
-    width: 100%;
-    /* Adiciona uma sombra leve para separar do conteúdo que passa por baixo */
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-}
-
-header {
-    /* Garante que o título grande não tente "disputar" espaço com o nav */
+.img-container {
     position: relative;
-    z-index: 10;
+    aspect-ratio: 3/4;
+    overflow: hidden;
+    background: #f0f0f0;
+    margin-bottom: 1rem;
 }
 
-#site-content {
-    overflow: visible;
+.img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s ease;
+}
+
+.card-produto:hover img {
+    transform: scale(1.08);
+}
+
+/* Utilitários */
+.btn-primary {
+    background: var(--cor-primaria);
+    color: white;
+    padding: 12px 24px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: var(--transicao);
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary:hover {
+    background: var(--cor-destaque);
 }

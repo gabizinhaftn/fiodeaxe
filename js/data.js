@@ -1,4 +1,4 @@
-// Produtos iniciais (Base do seed.py)
+// Produtos iniciais (Base fixa)
 const PRODUTOS_BASE = [
     {
         id: 1,
@@ -20,16 +20,23 @@ const PRODUTOS_BASE = [
     }
 ];
 
-// Função para obter todos os produtos (Base + Adicionados pelo Admin)
+// Função unificada para obter todos os produtos
 function obterProdutos() {
-    const adicionados = JSON.parse(localStorage.getItem('produtos_extras')) || [];
+    // Tenta ler de ambas as chaves que estavas a usar para não perder dados
+    const extras = JSON.parse(localStorage.getItem('produtos_extras')) || [];
+    const db_local = JSON.parse(localStorage.getItem('fio_de_axe_db')) || [];
+    
+    // Filtra IDs duplicados caso existam nas duas listas
+    const adicionados = [...extras, ...db_local].filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+    
     return [...PRODUTOS_BASE, ...adicionados];
 }
 
-// Função para salvar novo produto
+// Função para salvar novo produto (usada pelo Admin)
 function salvarNovoProduto(produto) {
     const adicionados = JSON.parse(localStorage.getItem('produtos_extras')) || [];
-    produto.id = Date.now(); // Gera ID único baseado no timestamp
+    produto.id = Date.now(); 
     adicionados.push(produto);
     localStorage.setItem('produtos_extras', JSON.stringify(adicionados));
+    localStorage.setItem('fio_de_axe_db', JSON.stringify(adicionados)); // Sincroniza as duas chaves
 }

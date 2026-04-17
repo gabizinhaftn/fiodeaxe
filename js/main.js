@@ -5,65 +5,103 @@ function salvarCarrinho() {
     localStorage.setItem('carrinho_fio_de_axe', JSON.stringify(carrinho));
 }
 
+// ATUALIZADO: Agora verifica se o item já existe para somar quantidade
 function adicionarAoCarrinho(id) {
-    const produto = PRODUTOS.find(p => p.id === id);
+    const produtosBase = typeof PRODUTOS !== 'undefined' ? PRODUTOS : obterProdutos();
+    const produto = produtosBase.find(p => p.id === id);
+    
     if (produto) {
-        carrinho.push(produto);
+        const itemExistente = carrinho.find(item => item.id === id);
+
+        if (itemExistente) {
+            itemExistente.quantidade += 1;
+        } else {
+            // Adiciona o produto com a propriedade quantidade inicializada em 1
+            carrinho.push({ ...produto, quantidade: 1 });
+        }
+        
         salvarCarrinho();
-        alert(`${produto.nome} adicionado ao carrinho!`);
+        if (typeof updateCartUI === 'function') {
+            updateCartUI();
+        }
+        alert(`${produto.nome} adicionado à sacola!`);
+    }
+}
+
+// NOVO: Função para aumentar ou diminuir quantidade
+function alterarQuantidade(id, delta) {
+    const item = carrinho.find(item => item.id === id);
+    if (item) {
+        item.quantidade += delta;
+        
+        // Se a quantidade chegar a 0, removemos o item
+        if (item.quantidade <= 0) {
+            carrinho = carrinho.filter(i => i.id !== id);
+        }
+        
+        salvarCarrinho();
+        updateCartUI();
     }
 }
 
 function removerDoCarrinho(index) {
     carrinho.splice(index, 1);
     salvarCarrinho();
-    location.reload();
+    updateCartUI();
 }
 
 function limparCarrinho() {
     localStorage.removeItem('carrinho_fio_de_axe');
-    location.reload();
+    carrinho = [];
+    updateCartUI();
 }
 
-/** * ATUALIZAÇÃO: Lógica de Checkout com validação de usuário
- * Mantendo as funções acima intactas.
+/** * ATUALIZAÇÃO: Lógica de Checkout com validação de usuário e Quantidades
  */
-
-function finalizarCompra() {
-    // Busca o usuário logado no LocalStorage (definido no auth.js)
-    const usuarioAtivo = JSON.parse(localStorage.getItem('fio_de_axe_cliente_ativo'));
-
-    // 1. Validação de Login
-    if (!usuarioAtivo || !usuarioAtivo.logado) {
-        alert("Para concluir sua compra, por favor acesse sua conta ou cadastre-se.");
-        window.location.href = 'login.html';
-        return;
-    }
-
-    // 2. Validação de Carrinho Vazio
+async function finalizarCompra() {
+    // 1. Validação de Carrinho Vazio
     if (carrinho.length === 0) {
         alert("Sua sacola está vazia!");
         return;
     }
 
-    // 3. Preparação da Mensagem para WhatsApp
-    const numeroWhatsApp = "5511913333917"; // Seu número configurado
-    let total = 0;
+    // 2. Preparação da Mensagem para WhatsApp com Quantidades
+    const numeroWhatsApp = "5511913333917"; 
+    let totalVenda = 0;
     let itensTexto = "";
 
-    carrinho.forEach((item, index) => {
-        itensTexto += `${index + 1}. ${item.nome} - R$ ${parseFloat(item.preco).toFixed(2)}\n`;
-        total += parseFloat(item.preco);
+    carrinho.forEach((item) => {
+        const subtotalItem = parseFloat(item.preco) * item.quantidade;
+        itensTexto += `• ${item.nome} (${item.quantidade}x) - R$ ${subtotalItem.toFixed(2)}\n`;
+        totalVenda += subtotalItem;
     });
 
-    const mensagem = encodeURIComponent(
-        `Olá! Me chamo ${usuarioAtivo.nome}.\n` +
-        `Gostaria de finalizar meu pedido:\n\n` +
-        `${itensTexto}\n` +
-        `*Total: R$ ${total.toFixed(2)}*\n\n` +
-        `Aguardo instruções para pagamento.`
-    );
+    const mensagem = `Olá! Gostaria de encomendar os seguintes itens:\n\n${itensTexto}\n*Total: R$ ${totalVenda.toFixed(2)}*`;
 
-    // 4. Redirecionamento
-    window.open(`https://wa.me/${numeroWhatsApp}?text=${mensagem}`, '_blank');
+    try {
+        // Se houver integração com Firebase (como no seu index.html)
+        if (window.db_online && window.userLogado) {
+            await window.addDoc(window.collection(window.db_online, "vendas"), {
+                userId: window.userLogado.uid,
+                cliente: window.userLogado.displayName || window.userLogado.email,
+                itens: carrinho.map(i => `${i.nome} (${i.quantidade}x)`).join(', '),
+                total: totalVenda.toFixed(2),
+                data: new Date().toLocaleDateString('pt-BR'),
+                status: "Aguardando Pagamento",
+                pagamento: "Pendente"
+            });
+        }
+
+        window.open(`https://api.whatsapp.com/send?phone=${numeroWhatsApp}&text=${encodeURIComponent(mensagem)}`, '_blank');
+        
+        // Limpa o carrinho após o sucesso
+        carrinho = [];
+        salvarCarrinho();
+        updateCartUI();
+        if (typeof toggleCart === 'function') toggleCart();
+        
+    } catch (e) {
+        console.error("Erro ao registrar pedido:", e);
+        alert("Erro ao registrar pedido no banco de dados.");
+    }
 }
