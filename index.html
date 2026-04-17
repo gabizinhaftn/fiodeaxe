@@ -43,27 +43,27 @@
         window.signInWithEmailAndPassword = signInWithEmailAndPassword;
 
         onAuthStateChanged(auth, (user) => {
-    window.userLogado = user;
-    const saudacaoDiv = document.getElementById('saudacao-usuario');
-    const btnLogin = document.getElementById('btn-login-nav');
-    
-    if (user) {
-        // Pega o nome do Google ou a primeira parte do e-mail
-        const nomeUsuario = user.displayName || user.email.split('@')[0];
+        window.userLogado = user;
+        const saudacaoDiv = document.getElementById('saudacao-usuario');
+        const btnLogin = document.getElementById('btn-login-nav');
         
-        // Insere o texto na div que você criou no HTML
-        if (saudacaoDiv) {
-            saudacaoDiv.innerHTML = `
-                <div class="block py-4 px-2 animate-fade-in">
-                    <h2 class="font-cinzel text-lg md:text-2xl text-stone-800 tracking-[3px] break-words">
-                        AXÉ, ${nomeUsuario.toUpperCase()}!
-                    </h2>
-                    <p class="text-[9px] md:text-[11px] text-stone-500 uppercase tracking-[2px] mt-2">
-                        Confira as peças selecionadas para você
-                    </h2>
-                </div>
-            `;
-        }
+        if (user) {
+            // Pega o nome do Google ou a primeira parte do e-mail
+            const nomeUsuario = user.displayName || user.email.split('@')[0];
+            
+            // Insere o texto na div que você criou no HTML
+            if (saudacaoDiv) {
+                saudacaoDiv.innerHTML = `
+                    <div class="block py-4 px-2 animate-fade-in">
+                        <h2 class="font-cinzel text-lg md:text-2xl text-stone-800 tracking-[3px] break-words">
+                            AXÉ, ${nomeUsuario.toUpperCase()}!
+                        </h2>
+                        <p class="text-[9px] md:text-[11px] text-stone-500 uppercase tracking-[2px] mt-2">
+                            Confira as peças selecionadas para você
+                        </h2>
+                    </div>
+                `;
+            }
 
         if(btnLogin) {
             btnLogin.innerHTML = `Sair (${nomeUsuario})`;
