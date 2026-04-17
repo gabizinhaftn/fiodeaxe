@@ -266,7 +266,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, writeBatch, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, writeBatch, getDocs, orderBy, query, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBwW7An4b8M6WHFB5PNXBKXFDNZ5Nw1fIY",
@@ -360,7 +360,7 @@
             updateStats();
         });
 
-        // Cadastro
+        // Cadastro com ID Sequencial (OPÇÃO B)
         document.getElementById('form-cadastro').onsubmit = async function(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-publicar');
@@ -373,20 +373,42 @@
             const reader = new FileReader();
             reader.onload = async (event) => {
                 try {
-                    await addDoc(collection(fbDb, "produtos"), {
-                        nome: document.getElementById('nome').value,
-                        categoria: document.getElementById('categoria').value,
-                        preco: document.getElementById('preco').value,
-                        status: document.getElementById('status').value,
-                        descricao: document.getElementById('descricao').value,
-                        imagem: event.target.result,
-                        criadoEm: new Date()
+                    // Usando Transação para garantir ID único sequencial
+                    const sfDocRef = doc(fbDb, "metadados", "contador_pedidos");
+                    
+                    await runTransaction(fbDb, async (transaction) => {
+                        const sfDoc = await transaction.get(sfDocRef);
+                        if (!sfDoc.exists()) {
+                            // Se não existir, inicializa (garantia de erro zero)
+                            transaction.set(sfDocRef, { ultimoId: 0 });
+                            var novoIdNum = 1;
+                        } else {
+                            var novoIdNum = sfDoc.data().ultimoId + 1;
+                        }
+
+                        // Atualiza contador de metadados
+                        transaction.update(sfDocRef, { ultimoId: novoIdNum });
+
+                        // Salva o produto na coleção oficial
+                        const novoProdutoRef = doc(collection(fbDb, "produtos"));
+                        transaction.set(novoProdutoRef, {
+                            pedidoNumero: `#${novoIdNum}`, // O ID que você queria ver
+                            nome: document.getElementById('nome').value,
+                            categoria: document.getElementById('categoria').value,
+                            preco: document.getElementById('preco').value,
+                            status: document.getElementById('status').value,
+                            descricao: document.getElementById('descricao').value,
+                            imagem: event.target.result,
+                            criadoEm: new Date()
+                        });
                     });
+
                     showToast("Produto publicado na vitrine!");
                     document.getElementById('form-cadastro').reset();
                     document.getElementById('image-preview').classList.add('hidden');
                     document.getElementById('preview-text').classList.remove('hidden');
                 } catch (err) {
+                    console.error(err);
                     showToast("Erro ao publicar.", "error");
                 } finally {
                     btn.innerText = "Publicar Produto";
@@ -485,7 +507,9 @@
             corpo.innerHTML = dados.map(p => `
                 <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
                     <td class="p-4"><img src="${p.imagem}" class="w-12 h-16 object-cover rounded shadow-sm border border-stone-100"></td>
-                    <td class="p-4 font-bold text-stone-800 uppercase text-xs">${p.nome}</td>
+                    <td class="p-4 font-bold text-stone-800 uppercase text-xs">
+                        <span class="text-orange-500 mr-1">${p.pedidoNumero || ''}</span>${p.nome}
+                    </td>
                     <td class="p-4 text-[10px] text-stone-400 uppercase font-bold tracking-widest">${p.categoria || 'Geral'}</td>
                     <td class="p-4 text-stone-500 font-bold">R$ ${parseFloat(p.preco || 0).toFixed(2)}</td>
                     <td class="p-4"><span class="px-3 py-1 text-[9px] font-bold uppercase rounded status-${p.status}">${p.status.replace('_', ' ')}</span></td>
@@ -499,7 +523,7 @@
             `).join('');
         }
 
-        // --- RENDERIZAÇÃO DO REGISTRO DE VENDAS (AQUILO QUE VOCÊ QUERIA) ---
+        // --- RENDERIZAÇÃO DO REGISTRO DE VENDAS ---
         function renderizarRegistroVendas() {
             const tabela = document.getElementById('tabela-registro-vendas');
             if (!tabela) return;
@@ -511,7 +535,7 @@
 
             tabela.innerHTML = listaVendasDB.map(v => `
                 <tr class="border-b border-stone-50 hover:bg-stone-50 transition">
-                    <td class="px-6 py-4 font-bold text-orange-600 text-[11px]">${v.idPedido || '#--'}</td>
+                    <td class="px-6 py-4 font-bold text-orange-600 text-[11px]">${v.pedidoNumero || '#--'}</td>
                     <td class="px-6 py-4 font-semibold text-[12px] text-stone-800">${v.cliente || 'Anônimo'}</td>
                     <td class="px-6 py-4 text-[11px] text-stone-500 italic">${v.itens || 'Produtos'}</td>
                     <td class="px-6 py-4 font-bold text-[12px]">R$ ${parseFloat(v.valorTotal || 0).toFixed(2)}</td>
