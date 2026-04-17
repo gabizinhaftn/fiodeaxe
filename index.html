@@ -699,22 +699,31 @@
 
             try {
                 if (window.db_online && window.addDoc) {
-                    await window.addDoc(window.collection(window.db_online, "vendas"), {
+                    // Criamos o objeto do pedido com os campos exatos do seu painel administrativo
+                    const dadosPedido = {
                         userId: window.userLogado.uid,
+                        uid: window.userLogado.uid, // Campo UID para facilitar o filtro do cliente
                         cliente: window.userLogado.displayName || window.userLogado.email,
                         itens: nomesString,
                         total: totalVenda.toFixed(2),
+                        valorTotal: totalVenda.toFixed(2), // Compatibilidade com tabela de vendas
                         data: new Date().toLocaleDateString('pt-BR'),
-                        status: "Aguardando Pagamento",
+                        status: "Aguardando Pagamento", // Status que o cliente verá
+                        pagamento: "PENDENTE", // Status financeiro
+                        logistica: "AGUARDANDO PAGAMENTO", // Status de logística como na imagem
                         timestamp: new Date()
-                    });
+                    };
+
+                    // Salva na coleção 'vendas' para o Admin
+                    await window.addDoc(window.collection(window.db_online, "vendas"), dadosPedido);
+                    
+                    // Salva também na coleção 'pedidos' para garantir que apareça em "Meus Pedidos" do cliente
+                    await window.addDoc(window.collection(window.db_online, "pedidos"), dadosPedido);
                 }
             } catch (e) { console.error("Erro banco:", e); }
 
             const urlWpp = `https://wa.me/${numero}?text=${encodeURIComponent(mensagem)}`;
             
-            // --- AJUSTE PARA CELULAR (STABLE REDIRECT) ---
-            // Detecta se é celular para usar redirecionamento direto, evitando bloqueio de pop-up
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             
             if (isMobile) {
@@ -725,7 +734,6 @@
             }
 
             carrinho = [];
-            // Verifica se a função existe antes de chamar para não travar o script
             if(typeof salvarEAtualizar === "function") {
                 salvarEAtualizar();
             } else {
@@ -734,7 +742,7 @@
             }
             
             toggleCart();
-            showToast("Redirecionando...");
+            showToast("Pedido registrado! Redirecionando...");
         }
 
         // Criando um alias caso o HTML chame finalizarCompra
