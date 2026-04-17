@@ -461,12 +461,25 @@
             const vitrine = document.getElementById('vitrine');
             if (!vitrine) return;
             
+            // Criar a mensagem de boas-vindas se o usuário estiver logado
+            let saudacaoHtml = "";
+            if (window.userLogado) {
+                const nomeUsuario = window.userLogado.displayName || window.userLogado.email.split('@')[0];
+                saudacaoHtml = `
+                    <div class="col-span-full mb-8 text-center">
+                        <h2 class="font-cinzel text-2xl text-stone-800">Axé, ${nomeUsuario}!</h2>
+                        <p class="text-stone-500 text-[11px] uppercase tracking-[3px] mt-2">Confira as peças selecionadas para você</p>
+                    </div>
+                `;
+            }
+
             if(lista.length === 0) {
-                vitrine.innerHTML = `<p class="col-span-full text-center py-20 text-stone-400 uppercase text-[12px] tracking-widest">Buscando coleção no Axé...</p>`;
+                vitrine.innerHTML = saudacaoHtml + `<p class="col-span-full text-center py-20 text-stone-400 uppercase text-[12px] tracking-widest">Buscando coleção no Axé...</p>`;
                 return;
             }
             
-            vitrine.innerHTML = lista.map(p => `
+            // Renderiza a saudação + os produtos
+            vitrine.innerHTML = saudacaoHtml + lista.map(p => `
                 <div class="product-card group">
                     <div class="relative aspect-[3/4] overflow-hidden rounded-[15px] mb-6 bg-stone-100 shadow-inner">
                         <img src="${p.imagem}" class="w-full h-full object-cover transition duration-500 group-hover:scale-110" onerror="this.src='https://via.placeholder.com/400x533?text=Imagem+Indisponivel'">
