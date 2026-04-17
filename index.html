@@ -7,7 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="js/auth.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
-     
+    <script>
+        if (window.innerWidth <= 768) {
+            window.location.href = "mobile.html";
+        }
+    </script>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, onSnapshot, query, addDoc, where, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";

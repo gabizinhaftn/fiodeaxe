@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Fio de Axé - Mobile</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Montserrat:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Montserrat', sans-serif; background-color: #fffaf5; }
+        .axe-title { font-family: 'Cinzel', serif; }
+        /* Scroll suave e visual de app */
+        .product-card { transition: transform 0.2s; }
+        .product-card:active { transform: scale(0.98); }
+        .bottom-nav { border-top: 1px solid #eee; }
+    </style>
+</head>
+<body class="pb-20">
+
+    <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md p-4 flex justify-between items-center shadow-sm">
+        <h1 class="axe-title text-xl font-bold text-stone-800">Fio de Axé</h1>
+        <div class="relative">
+            <button onclick="location.href='carrinho.html'" class="p-2">
+                🛒 <span id="cart-count" class="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] rounded-full h-4 w-4 flex items-center justify-center">0</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="p-4 flex gap-3 overflow-x-auto no-scrollbar py-4">
+        <button class="bg-stone-800 text-white px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap">Todos</button>
+        <button class="bg-stone-100 text-stone-600 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap">Guias</button>
+        <button class="bg-stone-100 text-stone-600 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap">Pulseiras</button>
+        <button class="bg-stone-100 text-stone-600 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap">Velas</button>
+    </div>
+
+    <main id="vitrine-mobile" class="p-4 grid grid-cols-2 gap-4">
+        <div class="col-span-2 text-center py-10 text-stone-400 italic">Buscando axé...</div>
+    </main>
+
+    <nav class="fixed bottom-0 left-0 right-0 bg-white bottom-nav flex justify-around p-3 z-50">
+        <button class="flex flex-col items-center gap-1 text-stone-800">
+            <span class="text-xl">🏠</span>
+            <span class="text-[10px] font-bold uppercase">Início</span>
+        </button>
+        <button class="flex flex-col items-center gap-1 text-stone-400">
+            <span class="text-xl">🔍</span>
+            <span class="text-[10px] font-bold uppercase">Busca</span>
+        </button>
+        <button onclick="window.location.href='https://wa.me/SEUNUMERO'" class="flex flex-col items-center gap-1 text-stone-400">
+            <span class="text-xl">💬</span>
+            <span class="text-[10px] font-bold uppercase">WhatsApp</span>
+        </button>
+    </nav>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // MESMA CONFIGURAÇÃO DO SEU BANCO
+        const firebaseConfig = {
+            apiKey: "AIzaSyBwW7An4b8M6WHFB5PNXBKXFDNZ5Nw1fIY",
+            authDomain: "fiodeaxe-d6e29.firebaseapp.com",
+            projectId: "fiodeaxe-d6e29",
+            storageBucket: "fiodeaxe-d6e29.firebasestorage.app",
+            messagingSenderId: "276832839443",
+            appId: "1:276832839443:web:4f34bd6ad0d159f9d41ce6"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Renderizar Vitrine Mobile
+        onSnapshot(collection(db, "produtos"), (snapshot) => {
+            const vitrine = document.getElementById('vitrine-mobile');
+            const produtos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            vitrine.innerHTML = produtos.map(p => `
+                <div class="product-card bg-white rounded-2xl overflow-hidden shadow-sm border border-stone-100 flex flex-col">
+                    <div class="relative aspect-[3/4]">
+                        <img src="${p.imagem}" class="w-full h-full object-cover">
+                        ${p.status === 'esgotado' ? '<div class="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-bold text-xs uppercase">Esgotado</div>' : ''}
+                    </div>
+                    <div class="p-3 flex flex-col flex-grow">
+                        <span class="text-[9px] uppercase tracking-tighter text-stone-400 font-bold">${p.categoria || 'Religioso'}</span>
+                        <h3 class="text-sm font-semibold text-stone-800 line-clamp-2 mt-1 leading-tight">${p.nome}</h3>
+                        <div class="mt-auto pt-2">
+                            <span class="text-base font-bold text-stone-900">R$ ${parseFloat(p.preco).toFixed(2).replace('.', ',')}</span>
+                            <button class="w-full mt-2 bg-stone-800 text-white py-2 rounded-xl text-[10px] font-bold uppercase active:bg-stone-600 transition">
+                                Adicionar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        });
+    </script>
+</body>
+</html>
