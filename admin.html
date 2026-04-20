@@ -483,8 +483,12 @@
                 document.getElementById('edit-nome').value = p.nome;
                 document.getElementById('edit-categoria').value = p.categoria;
                 document.getElementById('edit-preco').value = p.preco;
-                document.getElementById('edit-status').value = p.status
-                document.getElementById('editDescricao').value;
+                document.getElementById('edit-status').value = p.status;
+                
+                // ATUALIZAÇÃO: Agora o campo recebe a descrição do produto específico (p)
+                // O || '' serve para limpar o campo caso o produto não tenha descrição
+                document.getElementById('editDescricao').value = p.descricao || '';
+                
                 document.getElementById('modal-edicao').classList.remove('hidden');
             }
         };
