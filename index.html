@@ -807,6 +807,14 @@
                     `*Cliente:* ${nomeCliente}\n\n` +
                     `*Itens:*\n${resumoItensWpp}\n` +
                     `*Total a Pagar: R$ ${totalVenda.toFixed(2)}*\n\n` +
+                    `*DADOS PARA ENTREGA:*\n` +
+                    `Nome completo:\n` +
+                    `Endereço:\n` +
+                    `CEP:\n` +
+                    `Número:\n` +
+                    `Complemento:\n` +
+                    `Cidade:\n` +
+                    `Bairro:\n\n` +
                     `*ENVIAR O COMPROVANTE DE PAGAMENTO AQUI PARA PROSSEGUIR COM A COMPRA*`;
 
                 const urlWpp = `https://wa.me/${numeroWpp}?text=${encodeURIComponent(mensagemWpp)}`;
