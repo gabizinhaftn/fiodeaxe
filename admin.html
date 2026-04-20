@@ -431,7 +431,8 @@
                     nome: document.getElementById('edit-nome').value,
                     categoria: document.getElementById('edit-categoria').value,
                     preco: document.getElementById('edit-preco').value,
-                    status: document.getElementById('edit-status').value
+                    status: document.getElementById('edit-status').value,
+                    descricao: document.getElementById('editDescricao').value = produto.descricao || ''
                 });
                 showToast("Alterações salvas com sucesso!");
                 fecharModal();
@@ -473,7 +474,8 @@
                 document.getElementById('edit-nome').value = p.nome;
                 document.getElementById('edit-categoria').value = p.categoria;
                 document.getElementById('edit-preco').value = p.preco;
-                document.getElementById('edit-status').value = p.status;
+                document.getElementById('edit-status').value = p.status
+                document.getElementById('editDescricao').value;
                 document.getElementById('modal-edicao').classList.remove('hidden');
             }
         };
