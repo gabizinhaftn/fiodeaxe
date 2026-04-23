@@ -66,7 +66,7 @@
                         </div>
                     `;
                 }
- 
+
                 if (btnLogin) {
                     btnLogin.innerHTML = `Sair (${nomeUsuario})`;
                     btnLogin.onclick = () => auth.signOut().then(() => window.location.reload());
@@ -85,27 +85,6 @@
                 initFirebaseSync();
             }
         });
-
-        window.aplicarFiltrosEBusca = function() {
-            let termo = document.getElementById('input-busca').value.toLowerCase();
-            let ordem = document.getElementById('select-ordem').value;
-
-            // Filtra por nome (Case Insensitive)
-            let filtrados = db.filter(p => 
-                p.nome.toLowerCase().includes(termo) || 
-                (p.categoria && p.categoria.toLowerCase().includes(termo))
-            );
-
-            // Ordenação
-            if (ordem === "menor-preco") {
-                filtrados.sort((a, b) => parseFloat(a.preco) - parseFloat(b.preco));
-            } else if (ordem === "maior-preco") {
-                filtrados.sort((a, b) => parseFloat(b.preco) - parseFloat(a.preco));
-            }
-
-            renderizarVitrine(filtrados);
-        }
-
     </script>
 
     <style>
@@ -345,17 +324,6 @@
     </style>
 </head>
 <body>
-
-    <!-- Adicione isso antes da vitrine -->
-    <div class="max-w-7xl mx-auto px-4 flex flex-wrap gap-4 mb-8">
-        <input type="text" id="input-busca" onkeyup="aplicarFiltrosEBusca()" placeholder="Buscar guia, orixá..." class="flex-1 p-3 rounded-lg border border-stone-200 outline-none focus:border-orange-600">
-        
-        <select id="select-ordem" onchange="aplicarFiltrosEBusca()" class="p-3 rounded-lg border border-stone-200 outline-none">
-            <option value="recomendado">Recomendados</option>
-            <option value="menor-preco">Menor Preço</option>
-            <option value="maior-preco">Maior Preço</option>
-        </select>
-    </div>
 
     <div id="modal-auth" class="fixed inset-0 hidden flex items-center justify-center modal-auth p-4">
         <div class="bg-white p-8 rounded-2xl max-w-md w-full shadow-2xl relative">
